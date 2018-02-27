@@ -8,27 +8,146 @@ knitr::opts_chunk$set(echo = TRUE)
 
 # load library
 library(foreign)
+#library(haven)
 library(readxl)
 library(data.table)
 library(Hmisc)
-library(xlsx)
+library(openxlsx)
 ```
-```{r config, include=FALSE}
+```{r config, include=FALSE, echo=FALSE}
 dir = "tpb"
 dir_root = getwd()
 dir_root = substr(dir_root, 1, nchar(dir_root) - nchar(dir) - 1)
 
 # direktori dan nama file input
-## ssn direktori
-ssn_dir = "/media/DataNTFS/PabrikAngka/rawdata/Susenas201603"
+## path file rawdata ssn
+ssn_path = c(
+   "ssnind_2015", 
+   "X:/Documents/Garapan/pabrik angka/rawdata/Susenas2015/KOR15IND_DOB.sav",
+   "ssnind_2016", 
+   "X:/Documents/Garapan/pabrik angka/rawdata/Susenas201603/kor16ind_revisi_14122016.dbf"
+)
+
+#ssn_dir = "/media/DataNTFS/PabrikAngka/rawdata/Susenas201603"
 #ssn_dir = "E:/PabrikAngka/rawdata/Susenas201603"
 #ssn_dir = "X:/Documents/Garapan/pabrik angka/rawdata/Susenas201603"
-ssn_ind = "kor16ind_revisi_14122016.dbf"
-ssn_kor = ""
+#ssn_ind = "kor16ind_revisi_14122016.dbf"
+#ssn_kor = ""
+
 ssn_var = paste(dir_root, "_include/varssn.xls", sep = "/")
-lampir = paste(dir_root, "_include/lampiran.xlsx", sep = "/")
 
 ## baca matrik variabel R-SSN
 varssn_IND = read_xls(ssn_var, sheet = "individu")
+
+for (var_r in varssn_IND$R) {
+  assign(var_r, varssn_IND$V2016[which(varssn_IND$R == var_r)])
+}
+
+kodeprov = setDT(read_xls(ssn_var, sheet = "kodeprovinsi"))
+set2key(kodeprov, "prov")
+
+# read rawdata
+for (i in seq(from = 1, to = length(ssn_path), 2)) {
+   ssn = ssn_path[i]
+   temp_split = unlist(strsplit(ssn_path[i+1], ".", fixed = TRUE))
+   ext = temp_split[2]
+   
+   if (ext == "dbf") {
+      assign(paste("dt", ssn, sep = ""), setDT(read.dbf(ssn_path[i+1])))
+   } 
+   
+   else if (ext == "sav") {
+      assign(paste("dt", ssn, sep = ""), setDT(read.spss(ssn_path[i+1])))
+   }
+}
+
+dtind = setDT(read.spss("X:/Documents/Garapan/pabrik angka/rawdata/Susenas2015/KOR15IND_DOB.sav"))
+
+```
+```{r user function}
+
+```
+
+### Indikator 1.4.1.(a)
+#### Persentase perempuan pernah kawin umur 15-49 tahun 
+#### yang proses melahirkan terakhirnya di fasilitas kesehatan.
+```{r indikator 1.4.1.(a)}
+dtind = setDT(read.dbf("X:/Documents/Garapan/pabrik angka/rawdata/Susenas201603/kor16ind_revisi_14122016.dbf"))
+setkeyv(dtind, c(prov, kota_desa, jenis_kel))
+
+# hitung batas pendapatann 40%
+exp_cap_40 = wtd.quantile(dtind[[exp_cap]], 
+                          weights = dtind[[weight]],
+                          probs = 0.4, na.rm = TRUE)
+
+
+##########################################################################
+# indikator 1.4.1.(a)
+# -------------------
+# 
+# RUMUS ******************************************************************
+#                 JPSalifaskes
+# PSalifaskes = ---------------- X 100%
+#                  JP15-49th        
+#
+# Keterangan
+# PSalifaskes  = Persentase perempuan pernah kawin umur 15-49 tahun 
+#                yang proses melahirkan terakhirnya di fasilitas kesehatan
+# JPSalifaskes = Jumlah perempuan pernah kawin umur 15-49 tahun yang 
+#                proses melahirkan terakhirnya di fasilitas kesehatan
+#                (penduduk 40% terbawah/berpendapatan terendah)
+# JP15-49      = Jumlah perempuan pernah kawin umur 15-49 tahun 
+#                yang pernah melakukan persalinan
+#                (penduduk 40% terbawah/berpendapatan terendah)
+#************************************************************************
+
+## nilai absolut dan agregasi
+dt_temp = dtind[
+   ## filter jenis kelamin perempuan
+   get(jenis_kel) == 2 &
+   
+   ## filter status perkawinan pernah kawin
+   get(stat_kawin) >= 2 &
+      
+   ## filter umur 15 - 49
+   get(umur) >= 15 & get(umur) <= 49 &
+   
+   ## filter pernah melahirkan lahir hidup 
+   get(lahir_hidup_2th) == 1 &
+      
+   ## filter pendapatan 40%
+   get(exp_cap) < exp_cap_40,
+      
+   .( 
+      prov = get(prov),
+      kota_desa = get(kota_desa),
+      JPSalifaskes = ifelse(get(tempat_salin) <= 3, get(weight), 0),
+      JP15_49 = get(weight)
+   )
+]
+
+## persentase by prov
+dt_prov = cube(dt_temp, 
+     .(PSalifaskes = round(sum(JPSalifaskes) * 100 /sum(JP15_49), 2)), 
+     by=c("prov"))
+set2key(dt_prov, "prov")
+
+dt_prov = merge(dt_prov, kodeprov, all.x = TRUE)
+dt_prov[is.na(Provinsi), Provinsi := "Indonesia"]
+
+
+## persentase by kota-desa
+
+
+## plot
+plot_ly(dt_prov, x = ~PSalifaskes, y = ~Provinsi, name = "PSalifaskes", type = 'scatter',
+             mode = "markers", marker = list(color = "pink")) %>%
+  layout(
+    title = "PSalifaskes",
+    xaxis = list(title = "PSalifaskes (persen)"),
+    margin = list(l = 100)
+    
+  )
+
 ```
 
