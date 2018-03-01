@@ -39,10 +39,13 @@ ssn_var = paste(dir_root, "_include/varssn.xls", sep = "/")
 ## baca matrik variabel R-SSN
 varssn_IND = read_xls(ssn_var, sheet = "individu")
 
+## matrik var ssn
+varssn = "V2015"
 for (var_r in varssn_IND$R) {
-  assign(var_r, varssn_IND$V2016[which(varssn_IND$R == var_r)])
+  assign(var_r, varssn_IND[[varssn]][which(varssn_IND$R == var_r)])
 }
 
+## matrik kode provinsi
 kodeprov = setDT(read_xls(ssn_var, sheet = "kodeprovinsi"))
 set2key(kodeprov, "prov")
 
@@ -61,6 +64,7 @@ for (i in seq(from = 1, to = length(ssn_path), 2)) {
    }
 }
 
+## rawdata yang dipakai
 dtind = setDT(read.spss("X:/Documents/Garapan/pabrik angka/rawdata/Susenas2015/KOR15IND_DOB.sav"))
 
 ```
@@ -72,11 +76,11 @@ dtind = setDT(read.spss("X:/Documents/Garapan/pabrik angka/rawdata/Susenas2015/K
 #### Persentase perempuan pernah kawin umur 15-49 tahun 
 #### yang proses melahirkan terakhirnya di fasilitas kesehatan.
 ```{r indikator 1.4.1.(a)}
-dtind = setDT(read.dbf("X:/Documents/Garapan/pabrik angka/rawdata/Susenas201603/kor16ind_revisi_14122016.dbf"))
-setkeyv(dtind, c(prov, kota_desa, jenis_kel))
+## set key berdasarkan agregasi data untuk mempercepat komputasi
+setkeyv(dtind, c(prov, kota_desa))
 
 # hitung batas pendapatann 40%
-exp_cap_40 = wtd.quantile(dtind[[exp_cap]], 
+exp_cap_40 = wtd.quantile(dtind[[expcap]], 
                           weights = dtind[[weight]],
                           probs = 0.4, na.rm = TRUE)
 
@@ -116,7 +120,7 @@ dt_temp = dtind[
    get(lahir_hidup_2th) == 1 &
       
    ## filter pendapatan 40%
-   get(exp_cap) < exp_cap_40,
+   get(expcap) < exp_cap_40,
       
    .( 
       prov = get(prov),
@@ -126,28 +130,45 @@ dt_temp = dtind[
    )
 ]
 
-## persentase by prov
+## persentase by prov dan angka nasional
 dt_prov = cube(dt_temp, 
      .(PSalifaskes = round(sum(JPSalifaskes) * 100 /sum(JP15_49), 2)), 
      by=c("prov"))
-set2key(dt_prov, "prov")
 
 dt_prov = merge(dt_prov, kodeprov, all.x = TRUE)
 dt_prov[is.na(Provinsi), Provinsi := "Indonesia"]
 
 
 ## persentase by kota-desa
-
-
-## plot
-plot_ly(dt_prov, x = ~PSalifaskes, y = ~Provinsi, name = "PSalifaskes", type = 'scatter',
-             mode = "markers", marker = list(color = "pink")) %>%
-  layout(
-    title = "PSalifaskes",
-    xaxis = list(title = "PSalifaskes (persen)"),
-    margin = list(l = 100)
-    
-  )
-
+dt_temp[,
+   .(PSalifaskes = round(sum(JPSalifaskes) * 100 /sum(JP15_49), 2)),
+   by = list(kota_desa)
+]
 ```
+
+### Indikator 1.4.1.(b)
+#### Persentase anak umur 12-23 bulan 
+#### yang menerima imunisasi dasar lengkap
+```{r indikator 1.4.1.(b)}
+##########################################################################
+# indikator 1.4.1.(a)
+# -------------------
+# 
+# RUMUS ******************************************************************
+#                 JPSalifaskes
+# PSalifaskes = ---------------- X 100%
+#                  JP15-49th        
+#
+# Keterangan
+# PSalifaskes  = Persentase perempuan pernah kawin umur 15-49 tahun 
+#                yang proses melahirkan terakhirnya di fasilitas kesehatan
+# JPSalifaskes = Jumlah perempuan pernah kawin umur 15-49 tahun yang 
+#                proses melahirkan terakhirnya di fasilitas kesehatan
+#                (penduduk 40% terbawah/berpendapatan terendah)
+# JP15-49      = Jumlah perempuan pernah kawin umur 15-49 tahun 
+#                yang pernah melakukan persalinan
+#                (penduduk 40% terbawah/berpendapatan terendah)
+#************************************************************************
+```
+
 
