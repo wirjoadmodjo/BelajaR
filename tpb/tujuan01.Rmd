@@ -65,7 +65,7 @@ for (i in seq(from = 1, to = length(ssn_path), 2)) {
 }
 
 ## rawdata yang dipakai
-dtind = setDT(read.spss("X:/Documents/Garapan/pabrik angka/rawdata/Susenas2015/KOR15IND_DOB.sav"))
+dtind = setDT(read.spss("E:/PabrikAngka/rawdata/Susenas2015/KOR15IND_DOB.sav"))
 
 ```
 ```{r user function}
@@ -247,7 +247,9 @@ dt_jenis_kel = dt_temp[,
    by = list(jenis_kel)
 ]
 ```
-
-
+### Indikator 1.4.1.(c)
+#### Prevalensi penggunaan metode kontrasepsi (CPR) semua cara 
+#### pada Pasangan Usia Subur (PUS) usia 15-49 tahun
+#### yang berstatus kawin.
 
 
