@@ -9,12 +9,136 @@ library(Hmisc)
 #library(openxlsx)
 
 ## read data
-dtIND = setDT(read.dbf("E:/PabrikAngka/rawdata/Susenas201603/kor16ind_revisi_14122016.dbf"))
+dt_IND = setDT(read.dbf("E:/PabrikAngka/rawdata/Susenas201603/kor16ind_revisi_14122016.dbf"))
 
-## hitung batas pendapatan 40%
-exp_cap_40 = wtd.quantile(dtIND$EXP_CAP, 
-                          weights = dtIND$FWT_TAHUN,
-                          probs = 0.4, na.rm = TRUE)
+## hitung batas pendapatan 40% NASIONAL
+EXPCAP_40_NAS = wtd.quantile(dt_IND$EXP_CAP, 
+                     weights = dt_IND$FWT_TAHUN,
+                     probs = 0.4, na.rm = TRUE)
+
+## hitung batas pendapatan 40% PERKOTAAN
+EXPCAP_40_KOTA = wtd.quantile(dt_IND[R105==1,.(EXP_CAP, FWT_TAHUN)]$EXP_CAP, 
+                     weights = dt_IND[R105==1,.(EXP_CAP, FWT_TAHUN)]$FWT_TAHUN,
+                     probs = 0.4, na.rm = TRUE)
+
+## hitung batas pendapatan 40% PERDESAAN
+EXPCAP_40_DESA = wtd.quantile(dt_IND[R105==2,.(EXP_CAP, FWT_TAHUN)]$EXP_CAP, 
+                     weights = dt_IND[R105==2,.(EXP_CAP, FWT_TAHUN)]$FWT_TAHUN,
+                     probs = 0.4, na.rm = TRUE)
+
+
+### INDIKATOR 1.4.1.(c)
+
+## angka nasional
+dt_temp = dt_IND[
+   ## filter status perkawinan = kawin
+   R404 == 2 &
+   
+   ## filter jenis kelamin perempuan
+   R405 == 2 &
+      
+   ## filter umur 15-49 tahun
+   R407 >= 15 & R407 <= 49,
+      
+   
+   .(
+      ## jumlah pasangan usia subur
+      JPUS15_49  = ifelse(EXP_CAP <= EXPCAP_40_NAS, FWT_TAHUN, 0),
+      
+      ## jumlah yang sedang memakai CPR
+      JPUS_CPRSC = ifelse(R1401 == 2 & EXP_CAP <= EXPCAP_40_NAS, FWT_TAHUN, 0),
+      
+      ## jumlah PUS KOTA
+      JPUS15_49_KOTA = ifelse(R105 == 1 & EXP_CAP <= EXPCAP_40_KOTA, FWT_TAHUN, 0),
+      
+      ## jumlah yang sedang memakai CPR KOTA
+      JPUS_CPRSC_KOTA = 
+         ifelse(R105 == 1 & R1401 == 2 & EXP_CAP <= EXPCAP_40_KOTA, FWT_TAHUN, 0),
+      
+      ## jumlah PUS DESA
+      JPUS15_49_DESA = ifelse(R105 == 2 & EXP_CAP <= EXPCAP_40_DESA, FWT_TAHUN, 0),
+      
+      ## jumlah yang sedang memakai CPR DESA
+      JPUS_CPRSC_DESA = 
+         ifelse(R105 == 2 & R1401 == 2 & EXP_CAP <= EXPCAP_40_DESA, FWT_TAHUN, 0)
+   )
+]
+
+dt_temp[,
+   .(
+      CPR_SC = round((sum(JPUS_CPRSC) * 100 / sum(JPUS15_49)) ,2),
+      CPR_SC_KOTA = round((sum(JPUS_CPRSC_KOTA) * 100 / sum(JPUS15_49_KOTA)) ,2),
+      CPR_SC_DESA = round((sum(JPUS_CPRSC_DESA) * 100 / sum(JPUS15_49_DESA)) ,2)
+   )
+]
+
+R101 = unique(dt_IND$R101)
+EXPCAP_PROV = c()
+for (i in R101) {
+   temp_expcap = 
+      wtd.quantile(dt_IND[R101 == i,.(EXP_CAP, FWT_TAHUN)]$EXP_CAP, 
+                   weights = dt_IND[R105 == i,.(EXP_CAP, FWT_TAHUN)]$FWT_TAHUN,
+                   probs = 0.4, na.rm = TRUE)
+   
+   EXPCAP_PROV = c(EXPCAP_PROV, temp_expcap)
+   
+}
+
+dt_EXPCAP_PROV = data.table(R101, EXPCAP_PROV)
+
+dt_temp = dt_IND[
+   ## filter status perkawinan = kawin
+   R404 == 2 &
+      
+   ## filter jenis kelamin perempuan
+   R405 == 2 &
+      
+   ## filter umur 15-49 tahun
+   R407 >= 15 & R407 <= 49,
+   
+   
+   .(
+      ## prov
+      R101 = R101,
+      
+      ## R1401
+      R1401 = R1401,
+      
+      ## FWT
+      FWT_TAHUN = FWT_TAHUN,
+      
+      ## EXP
+      EXP_CAP = EXP_CAP
+   )
+]
+
+setkey(dt_temp, R101)
+setkey(dt_EXPCAP_PROV, R101)
+
+dt_temp = merge(dt_temp, dt_EXPCAP_PROV, all.x = TRUE)
+
+dt_temp = dt_temp[
+   EXP_CAP <= EXPCAP_PROV,
+   .(
+      R101 = R101,
+      
+      ## jumlah pasangan usia subur
+      JPUS15_49  = FWT_TAHUN,
+      
+      ## jumlah yang sedang memakai CPR
+      JPUS_CPRSC = ifelse(R1401 == 2, FWT_TAHUN, 0)
+   )
+]
+
+dt_temp[,
+   .(
+     CPR_SC = round((sum(JPUS_CPRSC) * 100 / sum(JPUS15_49)) ,2)
+   ), by = c("R101")
+]
+
+
+
+
 
 ### INDIKATOR 1.4.1.(a)
 dt_temp = dtIND[

@@ -4,7 +4,7 @@ output: html_document
 ---
 
 ```{r setup & library, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = FALSE)
 
 # load library
 library(foreign)
@@ -12,84 +12,93 @@ library(foreign)
 library(readxl)
 library(data.table)
 library(Hmisc)
-library(openxlsx)
+library(XLConnect)
 ```
-```{r config, include=FALSE, echo=FALSE}
-dir = "tpb"
-dir_root = getwd()
-dir_root = substr(dir_root, 1, nchar(dir_root) - nchar(dir) - 1)
 
-# direktori dan nama file input
-## path file rawdata ssn
-ssn_path = c(
-   "ssnind_2015", 
-   "X:/Documents/Garapan/pabrik angka/rawdata/Susenas2015/KOR15IND_DOB.sav",
-   "ssnind_2016", 
-   "X:/Documents/Garapan/pabrik angka/rawdata/Susenas201603/kor16ind_revisi_14122016.dbf"
-)
+### Hitung Pendapatan 40% Terendah
+```{r pendapatan 40% terendah Data Individu, include=FALSE, echo=FALSE}
+## EXPCAP 40% Nasional
+EXPCAP_40_NAS = wtd.quantile(dt_ssnIND[[expcap]],
+                            weights = dt_ssnIND[[bobot]],
+                            probs = 0.4, na.rm = TRUE)
 
-#ssn_dir = "/media/DataNTFS/PabrikAngka/rawdata/Susenas201603"
-#ssn_dir = "E:/PabrikAngka/rawdata/Susenas201603"
-#ssn_dir = "X:/Documents/Garapan/pabrik angka/rawdata/Susenas201603"
-#ssn_ind = "kor16ind_revisi_14122016.dbf"
-#ssn_kor = ""
+## EXPCAP 40% Nasional - Kota
+EXPCAP_40_KOTA = wtd.quantile(dt_ssnIND[get(kota_desa) == 1, get(expcap)],
+                              weights = dt_ssnIND[get(kota_desa) == 1, get(bobot)],
+                              probs = 0.4, na.rm = TRUE)
 
-ssn_var = paste(dir_root, "_include/varssn.xls", sep = "/")
+## EXPCAP 40% Nasional - Desa
+EXPCAP_40_DESA = wtd.quantile(dt_ssnIND[get(kota_desa) == 2, get(expcap)],
+                              weights = dt_ssnIND[get(kota_desa) == 2, get(bobot)],
+                              probs = 0.4, na.rm = TRUE)
 
-## baca matrik variabel R-SSN
-varssn_IND = read_xls(ssn_var, sheet = "individu")
+## EXPCAP 40% Nasional - Laki
+EXPCAP_40_L = wtd.quantile(dt_ssnIND[get(jenis_kel) == 1, get(expcap)],
+                              weights = dt_ssnIND[get(jenis_kel) == 1, get(bobot)],
+                              probs = 0.4, na.rm = TRUE)
 
-## matrik var ssn
-varssn = "V2015"
-for (var_r in varssn_IND$R) {
-  assign(var_r, varssn_IND[[varssn]][which(varssn_IND$R == var_r)])
+## EXPCAP 40% Nasional - Perempuan
+EXPCAP_40_P = wtd.quantile(dt_ssnIND[get(jenis_kel) == 2, get(expcap)],
+                              weights = dt_ssnIND[get(jenis_kel) == 2, get(bobot)],
+                              probs = 0.4, na.rm = TRUE)
+
+## EXPCAP 40% Provinsi
+assign(prov, unique(dt_ssnIND[[prov]]))
+
+EXPCAP_PROV = c()
+for (i in get(prov)) {
+   temp_expcap = 
+      wtd.quantile(dt_ssnIND[get(prov) == i, get(expcap)], 
+                   weights = dt_ssnIND[get(prov) == i, get(bobot)],
+                   probs = 0.4, na.rm = TRUE)
+   
+   EXPCAP_PROV = c(EXPCAP_PROV, temp_expcap)
 }
 
-## matrik kode provinsi
-kodeprov = setDT(read_xls(ssn_var, sheet = "kodeprovinsi"))
-set2key(kodeprov, "prov")
+dt_EXPCAP_PROV = data.table(get(prov), EXPCAP_PROV)
+setnames(dt_EXPCAP_PROV, "V1", prov)
+```
 
-# read rawdata
-for (i in seq(from = 1, to = length(ssn_path), 2)) {
-   ssn = ssn_path[i]
-   temp_split = unlist(strsplit(ssn_path[i+1], ".", fixed = TRUE))
-   ext = temp_split[2]
+```{r pendapatan 40% terendah Data Rumah Tangga, include=FALSE, echo=FALSE}
+## EXPCAP 40% Nasional
+EXPCAP_40_NAS_RT = wtd.quantile(dt_ssnRT[[expcap]],
+                            weights = dt_ssnRT[[bobot_rt]],
+                            probs = 0.4, na.rm = TRUE)
+
+## EXPCAP 40% Nasional - Kota
+EXPCAP_40_KOTA_RT = wtd.quantile(dt_ssnRT[get(kota_desa) == 1, get(expcap)],
+                              weights = dt_ssnRT[get(kota_desa) == 1, get(bobot_rt)],
+                              probs = 0.4, na.rm = TRUE)
+
+## EXPCAP 40% Nasional - Desa
+EXPCAP_40_DESA_RT = wtd.quantile(dt_ssnRT[get(kota_desa) == 2, get(expcap)],
+                              weights = dt_ssnRT[get(kota_desa) == 2, get(bobot_rt)],
+                              probs = 0.4, na.rm = TRUE)
+
+## EXPCAP 40% Provinsi
+assign(prov, unique(dt_ssnRT[[prov]]))
+
+EXPCAP_PROV = c()
+for (i in get(prov)) {
+   temp_expcap = 
+      wtd.quantile(dt_ssnRT[get(prov) == i, get(expcap)], 
+                   weights = dt_ssnRT[get(prov) == i, get(bobot_rt)],
+                   probs = 0.4, na.rm = TRUE)
    
-   if (ext == "dbf") {
-      assign(paste("dt", ssn, sep = ""), setDT(read.dbf(ssn_path[i+1])))
-   } 
-   
-   else if (ext == "sav") {
-      assign(paste("dt", ssn, sep = ""), setDT(read.spss(ssn_path[i+1])))
-   }
+   EXPCAP_PROV = c(EXPCAP_PROV, temp_expcap)
 }
 
-## rawdata yang dipakai
-dtind = setDT(read.spss("E:/PabrikAngka/rawdata/Susenas2015/KOR15IND_DOB.sav"))
-
-```
-```{r user function}
-
-
-
+dt_EXPCAP_PROV_RT = data.table(get(prov), EXPCAP_PROV)
+setnames(dt_EXPCAP_PROV_RT, "V1", prov)
 ```
 
 ### Indikator 1.4.1.(a)
-#### Persentase perempuan pernah kawin umur 15-49 tahun 
-#### yang proses melahirkan terakhirnya di fasilitas kesehatan.
-```{r indikator 1.4.1.(a)}
-## set key berdasarkan agregasi data untuk mempercepat komputasi
-setkeyv(dtind, c(prov, kota_desa))
-
-# hitung batas pendapatann 40%
-exp_cap_40 = wtd.quantile(dtind[[expcap]], 
-                          weights = dtind[[weight]],
-                          probs = 0.4, na.rm = TRUE)
-
-
-##########################################################################
+```{r nasional; kota; desa, echo=FALSE}
+# #########################################################################
 # indikator 1.4.1.(a)
 # -------------------
+# Persentase perempuan pernah kawin umur 15-49 tahun
+# yang proses melahirkan terakhirnya di fasilitas kesehatan.
 # 
 # RUMUS ******************************************************************
 #                 JPSalifaskes
@@ -107,8 +116,17 @@ exp_cap_40 = wtd.quantile(dtind[[expcap]],
 #                (penduduk 40% terbawah/berpendapatan terendah)
 #************************************************************************
 
-## nilai absolut dan agregasi
-dt_temp = dtind[
+#JP15-49 ==>   R405 = 2
+#              R404 >= 2
+#              R407 >= 15 dan R407 <= 49
+#              R1301 = 1
+#              EXPCAP = kuintil 1 dan kuintil 2
+
+#JPSalifaskes  filter JP15-49 dan
+#              R1302A <= 3
+
+## Angka Nasional, Kota, Desa
+dt_ssnIND[
    ## filter jenis kelamin perempuan
    get(jenis_kel) == 2 &
    
@@ -119,50 +137,78 @@ dt_temp = dtind[
    get(umur) >= 15 & get(umur) <= 49 &
    
    ## filter pernah melahirkan lahir hidup 
-   get(lahir_hidup_2th) == 1 &
+   get(lahir_hidup_2th) == 1,
+   
+   .(
+      Nasional = 
+         round(sum(ifelse(get(tempat_salin) <= 3 & get(expcap) <= EXPCAP_40_NAS,
+                          get(bobot), 0)) * 100 
+               /sum(ifelse(get(expcap) <= EXPCAP_40_NAS, 
+                          get(bobot), 0)), 2),
       
-   ## filter pendapatan 40%
-   get(expcap) <= exp_cap_40,
+      Kota = 
+         round(sum(ifelse(get(tempat_salin) <= 3 & get(kota_desa) == 1 & 
+                          get(expcap) <= EXPCAP_40_KOTA, get(bobot), 0)) * 100 
+               /sum(ifelse(get(kota_desa) == 1 & get(expcap) <= EXPCAP_40_KOTA, 
+                          get(bobot), 0)), 2),
       
-   .( 
-      prov = get(prov),
-      kota_desa = get(kota_desa),
-      JPSalifaskes = ifelse(get(tempat_salin) <= 3, get(weight), 0),
-      JP15_49 = get(weight)
+      Desa = 
+         round(sum(ifelse(get(tempat_salin) <= 3 & get(kota_desa) == 2 & 
+                          get(expcap) <= EXPCAP_40_DESA, get(bobot), 0)) * 100 
+               /sum(ifelse(get(kota_desa) == 2 & get(expcap) <= EXPCAP_40_DESA, 
+                          get(bobot), 0)), 2)
    )
 ]
+```
+```{r provinsi, echo=FALSE}
+## select kolumn yang akan digunakan untuk penghitungan
+sc = c(prov, tempat_salin, expcap, bobot)
+dt_temp = dt_ssnIND[
+   ## filter jenis kelamin perempuan
+   get(jenis_kel) == 2 &
 
-## persentase by prov dan angka nasional
-dt_prov = cube(dt_temp, 
-     .(PSalifaskes = round(sum(JPSalifaskes) * 100 /sum(JP15_49), 2)), 
-     by=c("prov"))
+## filter tanpa EXPCAP 40%
+   
+   ## filter status perkawinan pernah kawin
+   get(stat_kawin) >= 2 &
+      
+   ## filter umur 15 - 49
+   get(umur) >= 15 & get(umur) <= 49 &
+   
+   ## filter pernah melahirkan lahir hidup 
+   get(lahir_hidup_2th) == 1,
+      
+   sc, with = FALSE
+]
 
-dt_prov = merge(dt_prov, kodeprov, all.x = TRUE)
-dt_prov[is.na(Provinsi), Provinsi := "Indonesia"]
+## merge dengan data EXPCAP provinsi
+setkey(dt_temp, R101)
+setkey(dt_EXPCAP_PROV, R101)
 
+dt_temp = merge(dt_temp, dt_EXPCAP_PROV, all.x = TRUE)
 
-## persentase by kota-desa
-dt_kota_desa = dt_temp[,
-   .(PSalifaskes = round(sum(JPSalifaskes) * 100 /sum(JP15_49), 2)),
-   by = list(kota_desa)
+## filter dengan EXPCAP dan persentasekan
+dt_temp[
+   get(expcap) <= EXPCAP_PROV,
+   .(
+       PSalifaskes = 
+          round(
+             sum(ifelse(get(tempat_salin) <= 3, get(bobot), 0)) * 100 /sum(get(bobot)), 2)
+   ), by = c(prov)
 ]
 ```
 
 ### Indikator 1.4.1.(b)
-#### Persentase anak umur 12-23 bulan 
-#### yang menerima imunisasi dasar lengkap
-```{r indikator 1.4.1.(b)}
-## set key berdasarkan agregasi data untuk mempercepat komputasi
-setkeyv(dtind, c(prov, kota_desa, kota_desa, jenis_kel))
-
-##########################################################################
+```{r nasional; kota; desa; laki; perempuan, echo=FALSE}
+# #########################################################################
 # indikator 1.4.1.(b)
 # -------------------
-# 
+# Persentase anak umur 12-23 bulan yang menerima imunisasi dasar lengkap
+#
 # RUMUS ******************************************************************
-#                 JPSalifaskes
-# PSalifaskes = ---------------- X 100%
-#                  JP15-49th        
+#             JAIDL
+# PIDL = ---------------- X 100%
+#           JA12-23bln        
 #
 # Keterangan
 # PIDL         = Persentase anak umur 12-23 bulan 
@@ -175,81 +221,350 @@ setkeyv(dtind, c(prov, kota_desa, kota_desa, jenis_kel))
 #                (penduduk 40% terbawah/berpendapatan terendah)
 #************************************************************************
 
-dt_temp = dtind[
-   ## filter balita umur 12-23 bulan
-   get(umur_balita) >= 12 & get(umur_balita) <= 23 &
-      
-   ## filter pendapatan 40%
-   get(expcap) <= exp_cap_40,
+#JA12-23bln ==>   R902 >= 12 & R902 <= 23
+#                 pendapatan 40% terendah
+
+#JAIDL      ==>   filter JA12-23bln dan
+#                 3x DPT => R097f = 1 & R097g = 1 & R907h = 1
+#                 4x Polio => R907b = 1 & R907c = 1 & R907d = 1 & R907e = 1
+#                 1x Campak => R907m = 1
+#                 1x BCG => R907a = 1
+#                 4x Hepatitis B => R907i = 1 & R907j = 1 & R907k = 1 & R907l =1
+
+sc = c(prov, kota_desa, jenis_kel, expcap, bobot)
+
+dt_temp = dt_ssnIND[
+   ## filter umur balita 12-23 bulan
+   get(umur_balita) >= 12 & get(umur_balita) <= 23,
    
    .(
-      prov = get(prov),
-      kota_desa = get(kota_desa),
-      jenis_kel = get(jenis_kel),
-      JAIDL = ifelse(
-         ## imunisai DPT 3x
-         get(imun_dpt1) > 0 & get(imun_dpt2) > 0 & get(imun_dpt3) > 0 &
+      get(prov), get(kota_desa), get(jenis_kel), get(expcap), get(bobot),
+      IDL = ifelse(
+         ## 3x DPT
+         get(imun_dpt1) == 1 & get(imun_dpt2) == 1 & get(imun_dpt3) == 1 &
          
+         ## 4x Polio
+         #get(imun_polio1) == 1 & get(imun_polio2) == 1 & get(imun_polio3) & get(imun_polio4) == 1 &
+            
          ## versi polio 3x
          (
             ## polio 1, 2, 3
-            (get(imun_polio1) > 0 & get(imun_polio2) > 0 & get(imun_polio3) > 0) |
+            (get(imun_polio1) == 1 & get(imun_polio2) == 1  & get(imun_polio3) == 1) |
             ## polio 1, 3, 4
-            (get(imun_polio1) > 0 & get(imun_polio3) > 0 & get(imun_polio4) > 0) |
+            (get(imun_polio1) == 1 & get(imun_polio3) == 1 & get(imun_polio4) == 1) |
             ## polio 2, 3, 4
-            (get(imun_polio2) > 0 & get(imun_polio3) > 0 & get(imun_polio4) > 0)
+            (get(imun_polio2) == 1 & get(imun_polio3) == 1 & get(imun_polio4) == 1)
          ) &
-      
-         ## imunisasi Polio 4x
-         #get(imun_polio1) > 0 & get(imun_polio2) > 0 & get(imun_polio3) > 0 & get(imun_polio4) > 0 &
-         ## imunisasi campak & bcg
-         get(imun_campak) > 0  & get(imun_campak) > 0 &
+         
             
+         ## 1x Campak & 1x BCG
+         get(imun_campak) == 1 & get(imun_bcg) == 1 &
+            
+         ## 4x Hepatitis B
+         #get(imun_hb1) == 1 & get(imun_hb2) == 1 & get(imun_hb3) == 1 & get(imun_hb4) == 1, 1, 0
+         
          ## versi hepatitis 3x
          (
             ## 1, 2, 3
-            (get(imun_hb1) > 0 & get(imun_hb2) > 0 & get(imun_hb3) > 0) |
+            (get(imun_hb1) == 1 & get(imun_hb2) == 1 & get(imun_hb3) == 1) |
             ## 1, 3, 4
-            (get(imun_hb1) > 0 & get(imun_hb3) > 0 & get(imun_hb4) > 0) |
+            (get(imun_hb1) == 1 & get(imun_hb3) == 1 & get(imun_hb4) == 1) |
             ## 2, 3, 4
-            (get(imun_hb2) > 0 & get(imun_hb3) > 0 & get(imun_hb4) > 0)
-         ), 
-            
-         ## imunisasi hepatitis B 4x
-         #get(imun_hb1) > 0 & get(imun_hb2) > 0 & get(imun_hb3) > 0 & get(imun_hb4) > 0,
-         
-         get(weight), 0
-      ),
-      JA12_23bln = get(weight)
+            (get(imun_hb2) == 1 & get(imun_hb3) == 1 & get(imun_hb4) == 1)
+         ),  1,  0
+      )
    )
 ]
 
 ## replace NA value
-dt_temp[is.na(JAIDL), JAIDL := 0]
+dt_temp[is.na(IDL), IDL := 0]
 
-## persentase by prov dan angka nasional
-dt_prov = cube(dt_temp, 
-     .(PIDL = round(sum(JAIDL) * 100 /sum(JA12_23bln), 2)), 
-     by=c("prov"))
+## rename column
+setnames(dt_temp, c("V1", "V2", "V3", "V4", "V5"),
+         c(prov, kota_desa, jenis_kel, expcap, bobot))
 
-dt_prov = merge(dt_prov, kodeprov, all.x = TRUE)
-dt_prov[is.na(Provinsi), Provinsi := "Indonesia"]
-
-## persentase by kota-desa
-dt_kota_desa = dt_temp[,
-   .(PIDL = round(sum(JAIDL) * 100 /sum(JA12_23bln), 2)),
-   by = list(kota_desa)
-]
-
-## persentase by jenis kelamin
-dt_jenis_kel = dt_temp[,
-   .(PIDL = round(sum(JAIDL) * 100 /sum(JA12_23bln), 2)),
-   by = list(jenis_kel)
+## persentase Nasional, Kota, Desa, Laki-laki, Perempuan
+dt_temp[,
+   .(
+      Nasional = 
+         round(sum(ifelse(IDL == 1 & get(expcap) <= EXPCAP_40_NAS,
+                          get(bobot), 0)) * 100 
+              /sum(ifelse(get(expcap) <= EXPCAP_40_NAS, 
+                          get(bobot), 0)), 2),
+      
+      Kota = 
+         round(sum(ifelse(get(kota_desa) == 1 & IDL == 1 & get(expcap) <= EXPCAP_40_KOTA,
+                          get(bobot), 0)) * 100 
+              /sum(ifelse(get(kota_desa) == 1 & get(expcap) <= EXPCAP_40_KOTA, 
+                          get(bobot), 0)), 2),
+      
+      Desa = 
+         round(sum(ifelse(get(kota_desa) == 2 & IDL == 1 & get(expcap) <= EXPCAP_40_DESA,
+                          get(bobot), 0)) * 100 
+              /sum(ifelse(get(kota_desa) == 2 & get(expcap) <= EXPCAP_40_DESA, 
+                          get(bobot), 0)), 2),
+      
+      Laki = 
+         round(sum(ifelse(get(jenis_kel) == 1 & IDL == 1 & get(expcap) <= EXPCAP_40_L,
+                          get(bobot), 0)) * 100 
+              /sum(ifelse(get(jenis_kel) == 1 & get(expcap) <= EXPCAP_40_L, 
+                          get(bobot), 0)), 2),
+      
+      Perempuan = 
+         round(sum(ifelse(get(jenis_kel) == 2 & IDL == 1 & get(expcap) <= EXPCAP_40_P,
+                          get(bobot), 0)) * 100 
+              /sum(ifelse(get(jenis_kel) == 2 & get(expcap) <= EXPCAP_40_P, 
+                          get(bobot), 0)), 2)
+   )
 ]
 ```
-### Indikator 1.4.1.(c)
-#### Prevalensi penggunaan metode kontrasepsi (CPR) semua cara 
-#### pada Pasangan Usia Subur (PUS) usia 15-49 tahun
-#### yang berstatus kawin.
+
+```{r provinsi, echo=FALSE}
+## merge dengan data EXPCAP provinsi
+setkey(dt_temp, R101)
+setkey(dt_EXPCAP_PROV, R101)
+dt_temp = merge(dt_temp, dt_EXPCAP_PROV, all.x = TRUE)
+
+## filter dengan EXPCAP dan persentasekan
+dt_temp[
+   get(expcap) <= EXPCAP_PROV,
+   .(
+       PIDL = 
+          round(
+             sum(ifelse(IDL == 1 , get(bobot), 0)) * 100 /sum(get(bobot)), 2)
+   ), by = c(prov)
+]
+```
+
+## Indikator 1.4.1.(c)
+```{r Nasional; Kota; Desa, echo=FALSE}
+# #########################################################################
+# indikator 1.4.1.(c)
+# -------------------
+# Prevalensi penggunaan metode kontrasepsi (CPR) semua cara 
+# pada Pasangan Usia Subur (PUS) usia 15-49 tahun yang berstatus kawin
+#
+# RUMUS ******************************************************************
+#              JPUS-CPRSC
+# CPR-SC = ------------------ X 100%
+#              JPUS15-49        
+#
+# Keterangan
+# CPR-SC       = Pemakaian kontrasepsi (CPR) semua cara 
+#                pada Pasangan Usia Subur (PUS) umur15-49 tahun
+#                yang berstatus kawin
+# JPUS-CPRCS   = Jumlah PUS umur 15-49 tahun peserta KB aktif
+#                yang menggunakan alat kontrasepsi semua
+#                cara pada periode waktu tertentu 
+#                (penduduk 40% terbawah/berpendapatan terendah)
+# JPUS15-49    = Jumlah PUS umur 15-49 tahun pada periode waktu yang sama 
+#                (penduduk 40% terbawah/berpendapatan terendah)
+#************************************************************************
+
+#JPUS15-49  ==>   R407 >= 15 & R407 <= 49
+#                 R404 = 2
+#                 R405 = 2
+#                 pendapatan 40% terendah
+
+#JPUS-CPRCS ==>   filter JPUS15-49 dan
+#                 R1401 = 2
+
+## persentase Nasional, Kota, Desa
+dt_ssnIND[
+   ## filter umur 15-49thn
+   get(umur) >= 15 & get(umur) <= 49 &
+      
+   ## jenis kelamin perempuan
+   get(jenis_kel) == 2 &
+      
+   ## status perkawinan = kawin
+   get(stat_kawin) == 2,
+   
+   .(
+      Nasional = 
+         round(sum(ifelse(get(kontrasepsi_pakai) == 2 & get(expcap) <= EXPCAP_40_NAS,
+                          get(bobot), 0)) * 100 
+               /sum(ifelse(get(expcap) <= EXPCAP_40_NAS, 
+                          get(bobot), 0)), 2),
+      
+      Kota = 
+         round(sum(ifelse(get(kontrasepsi_pakai) == 2 & get(kota_desa) == 1 & 
+                          get(expcap) <= EXPCAP_40_KOTA, get(bobot), 0)) * 100 
+               /sum(ifelse(get(kota_desa) == 1 & get(expcap) <= EXPCAP_40_KOTA, 
+                          get(bobot), 0)), 2),
+      
+      Desa = 
+         round(sum(ifelse(get(kontrasepsi_pakai) == 2 & get(kota_desa) == 2 & 
+                          get(expcap) <= EXPCAP_40_DESA, get(bobot), 0)) * 100 
+               /sum(ifelse(get(kota_desa) == 2 & get(expcap) <= EXPCAP_40_DESA, 
+                          get(bobot), 0)), 2)
+   )
+]
+```
+
+```{r provinsi, echo=FALSE}
+## select kolumn yang akan digunakan untuk penghitungan
+sc = c(prov, kontrasepsi_pakai, expcap, bobot)
+dt_temp = dt_ssnIND[
+   ## filter umur 15-49thn
+   get(umur) >= 15 & get(umur) <= 49 &
+      
+   ## jenis kelamin perempuan
+   get(jenis_kel) == 2 &
+      
+   ## status perkawinan = kawin
+   get(stat_kawin) == 2,
+      
+   sc, with = FALSE
+]
+
+## merge dengan data EXPCAP provinsi
+setkey(dt_temp, R101)
+setkey(dt_EXPCAP_PROV, R101)
+
+dt_temp = merge(dt_temp, dt_EXPCAP_PROV, all.x = TRUE)
+
+## filter dengan EXPCAP dan persentasekan
+dt_temp[
+   get(expcap) <= EXPCAP_PROV,
+   .(
+       CPRSC = 
+          round(
+             sum(ifelse(get(kontrasepsi_pakai) == 2, get(bobot), 0)) * 100 /sum(get(bobot)), 2)
+   ), by = c(prov)
+]
+```
+
+## Indikator 1.4.1.(d)
+```{r Nasional; Kota; Desa, echo=FALSE}
+# #########################################################################
+# indikator 1.4.1.(d)
+# -------------------
+# Persentase rumah tangga yang memiliki akses terhadap layanan sumber
+# air minum layak dan berkelanjutan
+#
+# RUMUS ******************************************************************
+#              JRTML
+# PAML = ------------------ X 100%
+#              JRTS        
+#
+# Keterangan
+# PAML         = Persentase rumah tangga yang memiliki akses
+#                terhadap layanan sumber air minum layak dan
+#                berkelanjutan
+# JRTML        = Jumlah rumah tangga dengan akses terhadap
+#                sumber air minum berkualitas (layak)
+# JRTS         = Jumlah rumah tangga seluruhnya
+#                (penduduk 40% terbawah/berpendapatan terendah)
+#************************************************************************
+
+#JRTS       ==>   pendapatan 40% terendah
+
+#JRTML      ==>   filter JRTS dan
+#                 R1508A = 3,4,5,6,8,11
+#                 Jika R1508A = 5,6,8 =>  R1508B = 2
+
+
+dt_temp = dt_ssnRT[,
+   .(
+      get(prov), get(kota_desa), get(sumber_air), 
+      get(jarak_sumber_air), get(bobot_rt), get(expcap),
+      AML = ifelse(get(sumber_air) == 3 | get(sumber_air) == 4 | get(sumber_air) == 11 |
+            (get(sumber_air) == 5 & get(jarak_sumber_air) == 2) |
+            (get(sumber_air) == 6 & get(jarak_sumber_air) == 2) |
+            (get(sumber_air) == 8 & get(jarak_sumber_air) == 2), 1, 0
+      )  
+   )
+]
+
+## rename column
+setnames(dt_temp, c("V1", "V2", "V3", "V4", "V5", "V6"),
+         c(prov, kota_desa, sumber_air, jarak_sumber_air, bobot_rt, expcap))
+
+## persentase Nasional, Kota, Desa
+dt_temp[,
+   .(
+      Nasional = 
+         round(sum(ifelse(AML == 1 & get(expcap) <= EXPCAP_40_NAS_RT,
+                          get(bobot_rt), 0)) * 100 
+               /sum(ifelse(get(expcap) <= EXPCAP_40_NAS_RT, 
+                          get(bobot_rt), 0)), 2),
+      
+      Kota = 
+         round(sum(ifelse(AML == 1 & get(kota_desa) == 1 & 
+                          get(expcap) <= EXPCAP_40_KOTA_RT, get(bobot_rt), 0)) * 100 
+               /sum(ifelse(get(kota_desa) == 1 & get(expcap) <= EXPCAP_40_KOTA_RT, 
+                          get(bobot_rt), 0)), 2),
+      
+      Desa = 
+         round(sum(ifelse(AML == 1 & get(kota_desa) == 2 & 
+                          get(expcap) <= EXPCAP_40_DESA_RT, get(bobot_rt), 0)) * 100 
+               /sum(ifelse(get(kota_desa) == 2 & get(expcap) <= EXPCAP_40_DESA_RT, 
+                          get(bobot_rt), 0)), 2)
+   )
+]
+```
+
+```{r Provinsi, echo=FALSE}
+## merge dengan data EXPCAP provinsi
+setkey(dt_temp, R101)
+setkey(dt_EXPCAP_PROV_RT, R101)
+dt_temp = merge(dt_temp, dt_EXPCAP_PROV_RT, all.x = TRUE)
+
+## filter dengan EXPCAP dan persentasekan
+dt_temp[
+   get(expcap) <= EXPCAP_PROV,
+   .(
+       PAML = 
+          round(
+             sum(ifelse(AML == 1 , get(bobot_rt), 0)) * 100 /sum(get(bobot_rt)), 2)
+   ), by = c(prov)
+]
+```
+
+## Indikator 1.4.1.(e)
+```{r Nasional; Kota; Desa, echo=FALSE}
+# #########################################################################
+# indikator 1.4.1.(e)
+# -------------------
+# Persentase rumah tangga yang memiliki akses terhadap 
+# layanan sanitasi layak dan berkelanjutan
+#
+# RUMUS ******************************************************************
+#              JRTSL
+# PLSL = ------------------ X 100%
+#              JRTS        
+#
+# Keterangan
+# PLSL         = Persentase rumah tangga yang memiliki akses
+#                terhadap layanan sumber air minum layak dan
+#                berkelanjutan
+# JRTSL        = Jumlah rumah tangga dengan akses terhadap
+#                sumber air minum berkualitas (layak)
+# JRTS         = Jumlah rumah tangga seluruhnya
+#                (penduduk 40% terbawah/berpendapatan terendah)
+#************************************************************************
+
+#JRTS       ==>   pendapatan 40% terendah
+
+#JRTSL      ==>   filter JRTS dan
+#                 R1507A = 1 atau 2
+#                 R1507B = 1 
+#                 R1507C = 1 atau 3
+
+dt_temp = dt_ssnRT[,
+   .(
+      get(prov), get(kota_desa), get(expcap), get(bobot_rt),
+      LSL = ifelse(
+         (get(fas_bab) == 1 | get(fas_bab) == 2) & get(jenis_kloset) == 1 &
+         (get(tpa_tin) == 1 | get(tpa_tin) == 3), 1, 0
+      )
+   )
+]
+
+## rename column
+setnames(dt_temp, c("V1", "V2", "V3", "V4", "V5", "V6"),
+         c(prov, kota_desa, sumber_air, jarak_sumber_air, bobot_rt, expcap))
+```
 
 
