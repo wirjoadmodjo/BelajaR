@@ -118,33 +118,15 @@ indikator = "1.4.1.(a)"
 
 
 ## define rincian faskes persalinan berdasarkan tahun data
-switch(
-   vg_tahundata,
-   
-   "2015" = {
-      faskes = c(1,2,3)
-   },
-   
-   "2016" = {
-      faskes = c(1,2,3)
-   },
-   
-   "2017" = {
-      faskes = c(1,2,3,4,5,6)
-   }
-)
+faskes2015 = c("2015", "2016")
+if (any(faskes2015 == vg_tahundata)) {
+   faskes = c(1,2,3) 
+}
 
-switch(
-   vg_tahundata,
-   
-   c("2015", "2016") = {
-      print("2015 atau 2016")
-   },
-   
-   c("2017", "2018") = {
-      print("2017 atau 2018")
-   }
-)
+faskes2017 = c("2017")
+if (any(faskes2017 == vg_tahundata)) {
+   faskes = c(1,2,3,4,5,6) 
+}
 
 dt_ssnIND[
    ## filter jenis kelamin
