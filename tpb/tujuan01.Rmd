@@ -8,95 +8,80 @@ knitr::opts_chunk$set(echo = FALSE)
 
 # load library
 library(foreign)
-#library(haven)
-library(readxl)
 library(data.table)
-library(Hmisc)
+#library(Hmisc)
 library(XLConnect)
+library(grattan)
+
+tujuan = "tujuan01"
 ```
 
-### Hitung Pendapatan 40% Terendah
-```{r pendapatan 40% terendah Data Individu, include=FALSE, echo=FALSE}
-## EXPCAP 40% Nasional
-EXPCAP_40_NAS = wtd.quantile(dt_ssnIND[[expcap]],
-                            weights = dt_ssnIND[[bobot]],
-                            probs = 0.4, na.rm = TRUE)
-
-## EXPCAP 40% Nasional - Kota
-EXPCAP_40_KOTA = wtd.quantile(dt_ssnIND[get(kota_desa) == 1, get(expcap)],
-                              weights = dt_ssnIND[get(kota_desa) == 1, get(bobot)],
-                              probs = 0.4, na.rm = TRUE)
-
-## EXPCAP 40% Nasional - Desa
-EXPCAP_40_DESA = wtd.quantile(dt_ssnIND[get(kota_desa) == 2, get(expcap)],
-                              weights = dt_ssnIND[get(kota_desa) == 2, get(bobot)],
-                              probs = 0.4, na.rm = TRUE)
-
-## EXPCAP 40% Nasional - Laki
-EXPCAP_40_L = wtd.quantile(dt_ssnIND[get(jenis_kel) == 1, get(expcap)],
-                              weights = dt_ssnIND[get(jenis_kel) == 1, get(bobot)],
-                              probs = 0.4, na.rm = TRUE)
-
-## EXPCAP 40% Nasional - Perempuan
-EXPCAP_40_P = wtd.quantile(dt_ssnIND[get(jenis_kel) == 2, get(expcap)],
-                              weights = dt_ssnIND[get(jenis_kel) == 2, get(bobot)],
-                              probs = 0.4, na.rm = TRUE)
-
-## EXPCAP 40% Provinsi
-assign(prov, unique(dt_ssnIND[[prov]]))
-
-EXPCAP_PROV = c()
-for (i in get(prov)) {
-   temp_expcap = 
-      wtd.quantile(dt_ssnIND[get(prov) == i, get(expcap)], 
-                   weights = dt_ssnIND[get(prov) == i, get(bobot)],
-                   probs = 0.4, na.rm = TRUE)
-   
-   EXPCAP_PROV = c(EXPCAP_PROV, temp_expcap)
+```{r Beberapa function bantuan, echo=FALSE, include=FALSE}
+## fungsi untuk mengecek air minum dengan kombinasi
+## air mandi yang digunakan
+cek_mandi = function(minum, mandi) {
+   result = mandi %in% ar_mandi[!ar_mandi %in% minum]
+   return(result)
 }
-
-dt_EXPCAP_PROV = data.table(get(prov), EXPCAP_PROV)
-setnames(dt_EXPCAP_PROV, "V1", prov)
 ```
 
-```{r pendapatan 40% terendah Data Rumah Tangga, include=FALSE, echo=FALSE}
-## EXPCAP 40% Nasional
-EXPCAP_40_NAS_RT = wtd.quantile(dt_ssnRT[[expcap]],
-                            weights = dt_ssnRT[[bobot_rt]],
-                            probs = 0.4, na.rm = TRUE)
 
-## EXPCAP 40% Nasional - Kota
-EXPCAP_40_KOTA_RT = wtd.quantile(dt_ssnRT[get(kota_desa) == 1, get(expcap)],
-                              weights = dt_ssnRT[get(kota_desa) == 1, get(bobot_rt)],
-                              probs = 0.4, na.rm = TRUE)
+### Penggolongan Kuantil
+```{r Penggolongan Kuantil Data Individu, include=FALSE, echo=FALSE}
+## set index variabel akan sering dipakai
+setkeyv(dt_ssnIND, c(prov, kota_desa, jenis_kel, expcap))
 
-## EXPCAP 40% Nasional - Desa
-EXPCAP_40_DESA_RT = wtd.quantile(dt_ssnRT[get(kota_desa) == 2, get(expcap)],
-                              weights = dt_ssnRT[get(kota_desa) == 2, get(bobot_rt)],
-                              probs = 0.4, na.rm = TRUE)
+## Kuantil Nasional
+dt_ssnIND[,
+   ## variable baru kuantil Nasional
+   QNas:= weighted_ntile(get(expcap), get(bobot), n=5)
+]
 
-## EXPCAP 40% Provinsi
-assign(prov, unique(dt_ssnRT[[prov]]))
+## Kuantil Kota - Desa
+dt_ssnIND[,
+   QKD:= weighted_ntile(get(expcap), get(bobot), n=5),
+   by = get(kota_desa)
+]
 
-EXPCAP_PROV = c()
-for (i in get(prov)) {
-   temp_expcap = 
-      wtd.quantile(dt_ssnRT[get(prov) == i, get(expcap)], 
-                   weights = dt_ssnRT[get(prov) == i, get(bobot_rt)],
-                   probs = 0.4, na.rm = TRUE)
-   
-   EXPCAP_PROV = c(EXPCAP_PROV, temp_expcap)
-}
+## Kuantil Jenis Kelamin
+dt_ssnIND[,
+   QLP:= weighted_ntile(get(expcap), get(bobot), n=5),
+   by = get(jenis_kel)
+]
 
-dt_EXPCAP_PROV_RT = data.table(get(prov), EXPCAP_PROV)
-setnames(dt_EXPCAP_PROV_RT, "V1", prov)
+## Kuantil Provinsi
+dt_ssnIND[,
+   QProv:= weighted_ntile(get(expcap), get(bobot), n=5),
+   by = get(prov)
+]
+```
+
+```{r Penggolongan Kuantil Data Rumah Tangga, include=FALSE, echo=FALSE}
+setkeyv(dt_ssnRT, c(prov, kota_desa, expcap))
+
+## Kuantil Nasional
+dt_ssnRT[,
+   QNas:= weighted_ntile(get(expcap_rt), get(bobot_rt) * get(n_art), n=5)
+]
+
+## Kuantil Kota -Desa
+dt_ssnRT[,
+   QKD:= weighted_ntile(get(expcap_rt), get(bobot_rt) * get(n_art), n=5),
+   by = get(kota_desa)
+]
+
+## Kuantil Provinsi
+dt_ssnRT[,
+   QProv:= weighted_ntile(get(expcap_rt), get(bobot_rt) * get(n_art), n=5),
+   by = get(prov)
+]
 ```
 
 ### Indikator 1.4.1.(a)
-```{r nasional; kota; desa, echo=FALSE}
-# #########################################################################
+```{r Konsep dan Definisi, include=FALSE, echo=FALSE}
+# ************************************************************************
 # indikator 1.4.1.(a)
-# -------------------
+# ___________________
 # Persentase perempuan pernah kawin umur 15-49 tahun
 # yang proses melahirkan terakhirnya di fasilitas kesehatan.
 # 
@@ -123,86 +108,115 @@ setnames(dt_EXPCAP_PROV_RT, "V1", prov)
 #              EXPCAP = kuintil 1 dan kuintil 2
 
 #JPSalifaskes  filter JP15-49 dan
-#              R1302A <= 3
+#              R1302A = Rumah Sakit/Rumah Sakit Bersalin, 
+#                       Klinik/Bidan/Praktek Dokter
+#                       Puskesmas/Pustu/Polindes
+```
 
-## Angka Nasional, Kota, Desa
+```{r Pembentukan variable JPSalifaskes, echo=FALSE}
+indikator = "1.4.1.(a)"
+
+
+## define rincian faskes persalinan berdasarkan tahun data
+switch(
+   vg_tahundata,
+   
+   "2015" = {
+      faskes = c(1,2,3)
+   },
+   
+   "2016" = {
+      faskes = c(1,2,3)
+   },
+   
+   "2017" = {
+      faskes = c(1,2,3,4,5,6)
+   }
+)
+
+switch(
+   vg_tahundata,
+   
+   c("2015", "2016") = {
+      print("2015 atau 2016")
+   },
+   
+   c("2017", "2018") = {
+      print("2017 atau 2018")
+   }
+)
+
 dt_ssnIND[
-   ## filter jenis kelamin perempuan
+   ## filter jenis kelamin
    get(jenis_kel) == 2 &
-   
-   ## filter status perkawinan pernah kawin
+      
+   ## filter status pernah kawin
    get(stat_kawin) >= 2 &
       
-   ## filter umur 15 - 49
+   ## filter umur 15-19
    get(umur) >= 15 & get(umur) <= 49 &
-   
-   ## filter pernah melahirkan lahir hidup 
+      
+   ## filter pernah melahirkan lahir hidup
    get(lahir_hidup_2th) == 1,
    
-   .(
-      Nasional = 
-         round(sum(ifelse(get(tempat_salin) <= 3 & get(expcap) <= EXPCAP_40_NAS,
-                          get(bobot), 0)) * 100 
-               /sum(ifelse(get(expcap) <= EXPCAP_40_NAS, 
-                          get(bobot), 0)), 2),
-      
-      Kota = 
-         round(sum(ifelse(get(tempat_salin) <= 3 & get(kota_desa) == 1 & 
-                          get(expcap) <= EXPCAP_40_KOTA, get(bobot), 0)) * 100 
-               /sum(ifelse(get(kota_desa) == 1 & get(expcap) <= EXPCAP_40_KOTA, 
-                          get(bobot), 0)), 2),
-      
-      Desa = 
-         round(sum(ifelse(get(tempat_salin) <= 3 & get(kota_desa) == 2 & 
-                          get(expcap) <= EXPCAP_40_DESA, get(bobot), 0)) * 100 
-               /sum(ifelse(get(kota_desa) == 2 & get(expcap) <= EXPCAP_40_DESA, 
-                          get(bobot), 0)), 2)
-   )
+   ## variable baru 
+   ## penduduk yang melakukan persalinan di Faskes
+   JPSalifaskes:= as.integer(get(tempat_salin) %in% faskes) * 100
 ]
 ```
-```{r provinsi, echo=FALSE}
-## select kolumn yang akan digunakan untuk penghitungan
-sc = c(prov, tempat_salin, expcap, bobot)
-dt_temp = dt_ssnIND[
-   ## filter jenis kelamin perempuan
-   get(jenis_kel) == 2 &
 
-## filter tanpa EXPCAP 40%
+```{r Penghitungan angka nasional, include=FALSE, echo=FALSE}
+## Persentase Nasional
+hasil = dt_ssnIND[
+   ## filter kuintil nasional
+   QNas <= 2,
    
-   ## filter status perkawinan pernah kawin
-   get(stat_kawin) >= 2 &
-      
-   ## filter umur 15 - 49
-   get(umur) >= 15 & get(umur) <= 49 &
-   
-   ## filter pernah melahirkan lahir hidup 
-   get(lahir_hidup_2th) == 1,
-      
-   sc, with = FALSE
+   ## Persentase Nasional
+   .(PNas =  weighted.mean(JPSalifaskes, get(bobot), na.rm = TRUE))
 ]
 
-## merge dengan data EXPCAP provinsi
-setkey(dt_temp, R101)
-setkey(dt_EXPCAP_PROV, R101)
+## simpan hasil di excel
+write2xl(hasil$PNas, "nasional")
 
-dt_temp = merge(dt_temp, dt_EXPCAP_PROV, all.x = TRUE)
-
-## filter dengan EXPCAP dan persentasekan
-dt_temp[
-   get(expcap) <= EXPCAP_PROV,
-   .(
-       PSalifaskes = 
-          round(
-             sum(ifelse(get(tempat_salin) <= 3, get(bobot), 0)) * 100 /sum(get(bobot)), 2)
-   ), by = c(prov)
+## Persentase Kota Desa
+hasil = dt_ssnIND[
+   ## filter kuintil Kota Desa
+   QKD <= 2,
+   
+   ## Persentase Kota Desa
+   .(PKD = weighted.mean(JPSalifaskes, get(bobot), na.rm = TRUE)),
+   
+   ## group by kota desa
+   by = kota_desa
 ]
+
+## simpan hasil di excel
+write2xl(unlist(c(hasil[1,2], hasil[2,2])), "kotadesa")
 ```
+
+```{r Penghitungan angka provinsi, echo=FALSE, include=FALSE}
+## Penghitungan Perentase Provinsi
+hasil = dt_ssnIND[
+   ## filter kuintil Provinsi, 1 dan 2
+   QProv <= 2,
+   
+   ## Persentase Provinsi
+   .(PProv = weighted.mean(JPSalifaskes, get(bobot), na.rm = TRUE)),
+   
+   ## agregasi Provinsi
+   by = prov
+]
+
+## simpan hasil di excel
+write2xl(hasil$PProv, "provinsi")
+```
+
 
 ### Indikator 1.4.1.(b)
-```{r nasional; kota; desa; laki; perempuan, echo=FALSE}
-# #########################################################################
+```{r Konsep dan Definisi, include=FALSE, echo=FALSE}
+# ************************************************************************
 # indikator 1.4.1.(b)
-# -------------------
+# ___________________
 # Persentase anak umur 12-23 bulan yang menerima imunisasi dasar lengkap
 #
 # RUMUS ******************************************************************
@@ -225,122 +239,227 @@ dt_temp[
 #                 pendapatan 40% terendah
 
 #JAIDL      ==>   filter JA12-23bln dan
-#                 3x DPT => R097f = 1 & R097g = 1 & R907h = 1
-#                 4x Polio => R907b = 1 & R907c = 1 & R907d = 1 & R907e = 1
-#                 1x Campak => R907m = 1
-#                 1x BCG => R907a = 1
-#                 4x Hepatitis B => R907i = 1 & R907j = 1 & R907k = 1 & R907l =1
+#                 3x DPT 3x Polio 1x Campak 1x BCG 3x Hepatitis B
+```
 
-sc = c(prov, kota_desa, jenis_kel, expcap, bobot)
+```{r Pembentukan variable Imunisasi Dasar Lengkap, echo=FALSE, include=FALSE}
+indikator = "1.4.1.(b)"
 
-dt_temp = dt_ssnIND[
-   ## filter umur balita 12-23 bulan
-   get(umur_balita) >= 12 & get(umur_balita) <= 23,
+# define minimal jumlah imunisasi
+nDPT = 3
+nPolio = 3
+nCampak = 1
+nBCG = 1
+nHB = 3
+
+## define imunisasi berdasarkan tahun survey
+switch(
+   vg_tahundata,
    
-   .(
-      get(prov), get(kota_desa), get(jenis_kel), get(expcap), get(bobot),
-      IDL = ifelse(
-         ## 3x DPT
-         get(imun_dpt1) == 1 & get(imun_dpt2) == 1 & get(imun_dpt3) == 1 &
-         
-         ## 4x Polio
-         #get(imun_polio1) == 1 & get(imun_polio2) == 1 & get(imun_polio3) & get(imun_polio4) == 1 &
-            
-         ## versi polio 3x
-         (
-            ## polio 1, 2, 3
-            (get(imun_polio1) == 1 & get(imun_polio2) == 1  & get(imun_polio3) == 1) |
-            ## polio 1, 3, 4
-            (get(imun_polio1) == 1 & get(imun_polio3) == 1 & get(imun_polio4) == 1) |
-            ## polio 2, 3, 4
-            (get(imun_polio2) == 1 & get(imun_polio3) == 1 & get(imun_polio4) == 1)
-         ) &
-         
-            
-         ## 1x Campak & 1x BCG
-         get(imun_campak) == 1 & get(imun_bcg) == 1 &
-            
-         ## 4x Hepatitis B
-         #get(imun_hb1) == 1 & get(imun_hb2) == 1 & get(imun_hb3) == 1 & get(imun_hb4) == 1, 1, 0
-         
-         ## versi hepatitis 3x
-         (
-            ## 1, 2, 3
-            (get(imun_hb1) == 1 & get(imun_hb2) == 1 & get(imun_hb3) == 1) |
-            ## 1, 3, 4
-            (get(imun_hb1) == 1 & get(imun_hb3) == 1 & get(imun_hb4) == 1) |
-            ## 2, 3, 4
-            (get(imun_hb2) == 1 & get(imun_hb3) == 1 & get(imun_hb4) == 1)
-         ),  1,  0
-      )
+   "2015" = {
+      ## rincian2 imunisasi DPT
+      ##ar_DPT = c(r902f, r902g, r902h)
+   },
+   
+   "2016" = {
+      ## rincian semua imunisasi
+      ar_imun = c(imun_bcg, imun_polio1, imun_polio2, imun_polio3, imun_polio4,
+                  imun_dpt1, imun_dpt2, imun_dpt3, imun_hb_lahir, imun_hb1,
+                  imun_hb2, imun_hb3, imun_campak)
+      
+      ar_bcg = c(imun_bcg)
+      
+      ar_polio = c(imun_polio1, imun_polio2, imun_polio3, imun_polio4)
+      
+      ar_dpt = c(imun_dpt1, imun_dpt2, imun_dpt3)
+      
+      ar_hb = c(imun_hb_lahir, imun_hb1, imun_hb2, imun_hb3)
+      
+      ar_campak = c(imun_campak)
+   },
+   
+   "2017" = {
+      ## rincian semua imunisasi
+      ar_imun = c(imun_bcg, imun_polio1, imun_polio2, imun_polio3, imun_polio4,
+                  imun_dpt1, imun_dpt2, imun_dpt3, imun_hb_lahir, imun_hb1,
+                  imun_hb2, imun_hb3, imun_campak)
+       
+       
+      ar_imun = c("r1104a_tgl", "r1104b_tgl", "r1104c_tgl", "r1104d_tgl", "r1104e_tgl",
+                  "r1104f_tgl", "r1104g_tgl", "r1104h_tgl", "r1104i_tgl", "r1104j_tgl",
+                  "r1104k_tgl", "r1104l_tgl", "r1104m_tgl", "r1104n_tgl")
+      
+      # clean data
+      ## replace data tanggal imunisasi ke 1 bila tanggal > 0
+      for (j in names(dt_ssnIND[, ar_imun, with = FALSE])) {
+         set(dt_ssnIND,which(dt_ssnIND[[j]] > 0),j,1)
+      }
+   }
+)
+
+## cleaning data, replace NA value to 0
+for (j in names(dt_ssnIND[, ar_imun, with = FALSE])) {
+   set(dt_ssnIND,which(is.na(dt_ssnIND[[j]])),j,0)
+}
+
+## penghitungan jumlah imunisasi berdasarkan
+## catatan kartu KMS
+dt_ssnIND[,
+   
+   `:=` (
+      ## total imunisasi BCG
+      kbcg = rowSums(dt_ssnIND[, ar_bcg, with=FALSE], na.rm = TRUE),
+      
+      ## total imunisasi Polio
+      kpolio = rowSums(dt_ssnIND[, ar_polio, with=FALSE], na.rm = TRUE),
+      
+      ## total imunisasi DPT
+      kdpt = rowSums(dt_ssnIND[, ar_dpt, with=FALSE], na.rm = TRUE),
+      
+      ## total imunisasi Hepatitis B
+      khb = rowSums(dt_ssnIND[, ar_hb, with=FALSE], na.rm = TRUE),
+      
+      ## total imunisasi Campak
+      kcampak = rowSums(dt_ssnIND[, ar_campak, with=FALSE], na.rm = TRUE)
    )
 ]
 
-## replace NA value
-dt_temp[is.na(IDL), IDL := 0]
+## penghitungan jumlah imunisasi berdasarkan
+## ingatan responden
+dt_ssnIND[,
+   `:=` (
+      ## imunisasi bcg berdasarkan ingatan responden
+      mbcg = ifelse(get(bcg_cek) == 1, 1,0),
+      
+      ## imunisasi campak berdasarkan ingatan responden
+      mcampak = ifelse(get(campak_cek) == 1, 1,0)
+   )
+]
 
-## rename column
-setnames(dt_temp, c("V1", "V2", "V3", "V4", "V5"),
-         c(prov, kota_desa, jenis_kel, expcap, bobot))
+dt_ssnIND[
+   ## responden tidak dapat menunjukkan kartu KMS
+   get(kartu_kms) == 2 | get(punya_kms) > 0,
+   
+   `:=` (
+      ## imunisasi polio berdasarkan ingatan responden
+      mpolio = get(polio_cek),
+      
+      ## imunisasi dpt berdasarkan ingatan responden
+      mdpt = get(dpt_cek),
+      
+      ## imunisasi hepatitis B berdasarkan ingatan responden
+      mhb = get(hb_cek)
+   )
+]
 
-## persentase Nasional, Kota, Desa, Laki-laki, Perempuan
-dt_temp[,
-   .(
-      Nasional = 
-         round(sum(ifelse(IDL == 1 & get(expcap) <= EXPCAP_40_NAS,
-                          get(bobot), 0)) * 100 
-              /sum(ifelse(get(expcap) <= EXPCAP_40_NAS, 
-                          get(bobot), 0)), 2),
+ar_na2 = c("kbcg", "kpolio", "kdpt", "khb", "kcampak", 
+           "mbcg", "mpolio", "mdpt", "mhb", "mcampak")
+## cleaning data, replace NA value to 0
+for (j in names(dt_ssnIND[, ar_na2, with = FALSE])) {
+   set(dt_ssnIND,which(is.na(dt_ssnIND[[j]])),j,0)
+}
+
+## definisi imunisasi dasar lengkap 
+## dengan menjumlah hasil 2 metode diatas
+dt_ssnIND[,
+   ## variable imunisasi dasar lengkap
+   IDL:= as.integer(
+      ## cek jumlah imunisasi BCG
+      (kbcg + mbcg) >= nBCG &
       
-      Kota = 
-         round(sum(ifelse(get(kota_desa) == 1 & IDL == 1 & get(expcap) <= EXPCAP_40_KOTA,
-                          get(bobot), 0)) * 100 
-              /sum(ifelse(get(kota_desa) == 1 & get(expcap) <= EXPCAP_40_KOTA, 
-                          get(bobot), 0)), 2),
+      ## cek jumlah imunisasi Polio
+      (kpolio + mpolio) >= nPolio &
       
-      Desa = 
-         round(sum(ifelse(get(kota_desa) == 2 & IDL == 1 & get(expcap) <= EXPCAP_40_DESA,
-                          get(bobot), 0)) * 100 
-              /sum(ifelse(get(kota_desa) == 2 & get(expcap) <= EXPCAP_40_DESA, 
-                          get(bobot), 0)), 2),
-      
-      Laki = 
-         round(sum(ifelse(get(jenis_kel) == 1 & IDL == 1 & get(expcap) <= EXPCAP_40_L,
-                          get(bobot), 0)) * 100 
-              /sum(ifelse(get(jenis_kel) == 1 & get(expcap) <= EXPCAP_40_L, 
-                          get(bobot), 0)), 2),
-      
-      Perempuan = 
-         round(sum(ifelse(get(jenis_kel) == 2 & IDL == 1 & get(expcap) <= EXPCAP_40_P,
-                          get(bobot), 0)) * 100 
-              /sum(ifelse(get(jenis_kel) == 2 & get(expcap) <= EXPCAP_40_P, 
-                          get(bobot), 0)), 2)
+      ## cek jumlah imunisasi DPT
+      (kdpt + mdpt) >= nDPT &
+   
+      ## cek jumlah imunisasi Hepatitis B
+      (khb + mhb) >= nHB &
+         
+      ## cek jumlah imunisasi Campak
+      (kcampak + mcampak) >= nCampak
    )
 ]
 ```
 
-```{r provinsi, echo=FALSE}
-## merge dengan data EXPCAP provinsi
-setkey(dt_temp, R101)
-setkey(dt_EXPCAP_PROV, R101)
-dt_temp = merge(dt_temp, dt_EXPCAP_PROV, all.x = TRUE)
-
-## filter dengan EXPCAP dan persentasekan
-dt_temp[
-   get(expcap) <= EXPCAP_PROV,
-   .(
-       PIDL = 
-          round(
-             sum(ifelse(IDL == 1 , get(bobot), 0)) * 100 /sum(get(bobot)), 2)
-   ), by = c(prov)
+```{r Penghitungan angka nasional, include=FALSE, echo=FALSE}
+## Persentase Nasional
+hasil = dt_ssnIND[
+   ## filter umur balita 12-23 bulan
+   get(umur_balita) >= 12 & get(umur_balita) <= 23 &
+   
+   ## filter kuintil nasional
+   QNas <= 2,
+   
+   ## Persentase Nasional
+   .(PNas =  weighted.mean(IDL, get(bobot), na.rm = TRUE) * 100)
 ]
+
+## simpan hasil di excel
+write2xl(hasil$PNas, "nasional")
+
+## Persentase Laki-Perempuan
+hasil = dt_ssnIND[
+   ## filter umur balita 12-23 bulan
+   get(umur_balita) >= 12 & get(umur_balita) <= 23 &
+   
+   ## filter kuintil Kota Desa
+   QLP <= 2,
+   
+   ## Persentase Kota Desa
+   .(PLP = weighted.mean(IDL, get(bobot), na.rm = TRUE) * 100),
+   
+   ## group by kota desa
+   by = jenis_kel
+]
+
+## simpan hasil di excel
+write2xl(unlist(c(hasil[1,2], hasil[2,2])), "jk")
+
+## Persentase Kota Desa
+hasil = dt_ssnIND[
+   ## filter umur balita 12-23 bulan
+   get(umur_balita) >= 12 & get(umur_balita) <= 23 &
+   
+   ## filter kuintil Kota Desa
+   QKD <= 2,
+   
+   ## Persentase Kota Desa
+   .(PKD = weighted.mean(IDL, get(bobot), na.rm = TRUE) * 100),
+   
+   ## group by kota desa
+   by = kota_desa
+]
+
+## simpan hasil di excel
+write2xl(unlist(c(hasil[1,2], hasil[2,2])), "kotadesa")
+```
+
+```{r Penghitungan angka provinsi, echo=FALSE, include=FALSE}
+## Penghitungan Perentase Provinsi
+hasil = dt_ssnIND[
+   ## filter umur balita 12-23 bulan
+   get(umur_balita) >= 12 & get(umur_balita) <= 23 &
+      
+   ## filter kuintil Provinsi, 1 dan 2
+   QProv <= 2,
+   
+   ## Persentase Provinsi
+   .(PProv = weighted.mean(IDL, get(bobot), na.rm = TRUE) * 100),
+   
+   ## agregasi Provinsi
+   by = prov
+]
+
+## simpan hasil di excel
+write2xl(hasil$PProv, "provinsi")
 ```
 
 ## Indikator 1.4.1.(c)
-```{r Nasional; Kota; Desa, echo=FALSE}
-# #########################################################################
+```{r Konsep dan Definisi, echo=FALSE, include=FALSE}
+# ************************************************************************
 # indikator 1.4.1.(c)
-# -------------------
+# ___________________
 # Prevalensi penggunaan metode kontrasepsi (CPR) semua cara 
 # pada Pasangan Usia Subur (PUS) usia 15-49 tahun yang berstatus kawin
 #
@@ -368,8 +487,11 @@ dt_temp[
 
 #JPUS-CPRCS ==>   filter JPUS15-49 dan
 #                 R1401 = 2
+```
 
-## persentase Nasional, Kota, Desa
+```{r Pembentukan variable JPUS-CPRCS, echo=FALSE}
+indikator = "1.4.1.(c)"
+
 dt_ssnIND[
    ## filter umur 15-49thn
    get(umur) >= 15 & get(umur) <= 49 &
@@ -380,66 +502,63 @@ dt_ssnIND[
    ## status perkawinan = kawin
    get(stat_kawin) == 2,
    
-   .(
-      Nasional = 
-         round(sum(ifelse(get(kontrasepsi_pakai) == 2 & get(expcap) <= EXPCAP_40_NAS,
-                          get(bobot), 0)) * 100 
-               /sum(ifelse(get(expcap) <= EXPCAP_40_NAS, 
-                          get(bobot), 0)), 2),
-      
-      Kota = 
-         round(sum(ifelse(get(kontrasepsi_pakai) == 2 & get(kota_desa) == 1 & 
-                          get(expcap) <= EXPCAP_40_KOTA, get(bobot), 0)) * 100 
-               /sum(ifelse(get(kota_desa) == 1 & get(expcap) <= EXPCAP_40_KOTA, 
-                          get(bobot), 0)), 2),
-      
-      Desa = 
-         round(sum(ifelse(get(kontrasepsi_pakai) == 2 & get(kota_desa) == 2 & 
-                          get(expcap) <= EXPCAP_40_DESA, get(bobot), 0)) * 100 
-               /sum(ifelse(get(kota_desa) == 2 & get(expcap) <= EXPCAP_40_DESA, 
-                          get(bobot), 0)), 2)
-   )
+   ## variale baru
+   ## PUS yang menggunakan KB
+   PUS_CPRCS:= as.integer(get(kb_pakai) == 2) * 100
 ]
 ```
 
-```{r provinsi, echo=FALSE}
-## select kolumn yang akan digunakan untuk penghitungan
-sc = c(prov, kontrasepsi_pakai, expcap, bobot)
-dt_temp = dt_ssnIND[
-   ## filter umur 15-49thn
-   get(umur) >= 15 & get(umur) <= 49 &
-      
-   ## jenis kelamin perempuan
-   get(jenis_kel) == 2 &
-      
-   ## status perkawinan = kawin
-   get(stat_kawin) == 2,
-      
-   sc, with = FALSE
+```{r Penghitungan angka nasional, include=FALSE, echo=FALSE}
+## Persentase Nasional
+hasil = dt_ssnIND[
+   ## filter kuintil nasional
+   QNas <= 2,
+   
+   ## Persentase Nasional
+   .(PNas =  weighted.mean(PUS_CPRCS, get(bobot), na.rm = TRUE))
 ]
 
-## merge dengan data EXPCAP provinsi
-setkey(dt_temp, R101)
-setkey(dt_EXPCAP_PROV, R101)
+## simpan hasil di excel
+write2xl(hasil$PNas, "nasional")
 
-dt_temp = merge(dt_temp, dt_EXPCAP_PROV, all.x = TRUE)
-
-## filter dengan EXPCAP dan persentasekan
-dt_temp[
-   get(expcap) <= EXPCAP_PROV,
-   .(
-       CPRSC = 
-          round(
-             sum(ifelse(get(kontrasepsi_pakai) == 2, get(bobot), 0)) * 100 /sum(get(bobot)), 2)
-   ), by = c(prov)
+## Persentase Kota Desa
+hasil = dt_ssnIND[
+   ## filter kuintil Kota Desa
+   QKD <= 2,
+   
+   ## Persentase Kota Desa
+   .(PKD = weighted.mean(PUS_CPRCS, get(bobot), na.rm = TRUE)),
+   
+   ## group by kota desa
+   by = kota_desa
 ]
+
+## simpan hasil di excel
+write2xl(unlist(c(hasil[1,2], hasil[2,2])), "kotadesa")
+```
+
+```{r Penghitungan angka provinsi, echo=FALSE, include=FALSE}
+## Penghitungan Perentase Provinsi
+hasil = dt_ssnIND[
+   ## filter kuintil Provinsi, 1 dan 2
+   QProv <= 2,
+   
+   ## Persentase Provinsi
+   .(PProv = weighted.mean(PUS_CPRCS, get(bobot), na.rm = TRUE)),
+   
+   ## agregasi Provinsi
+   by = prov
+]
+
+## simpan hasil di excel
+write2xl(hasil$PProv, "provinsi")
 ```
 
 ## Indikator 1.4.1.(d)
-```{r Nasional; Kota; Desa, echo=FALSE}
-# #########################################################################
+```{r Konsep dan Definsi, echo=FALSE, include=FALSE}
+# ************************************************************************
 # indikator 1.4.1.(d)
-# -------------------
+# ___________________
 # Persentase rumah tangga yang memiliki akses terhadap layanan sumber
 # air minum layak dan berkelanjutan
 #
@@ -458,75 +577,165 @@ dt_temp[
 #                (penduduk 40% terbawah/berpendapatan terendah)
 #************************************************************************
 
-#JRTS       ==>   pendapatan 40% terendah
+# JRTS      ==>   pendapatan 40% terendah
 
-#JRTML      ==>   filter JRTS dan
-#                 R1508A = 3,4,5,6,8,11
-#                 Jika R1508A = 5,6,8 =>  R1508B = 2
+# Rumah Tangga
+# Air Layak ==>   Rumah tangga dikatakan menggunakan/mempunyai akses air minum layak 
+#                 apabila sumber air minum yang digunakan rumah tangga berasal dari 
+#                 leding, air terlindung (pompa/sumur bor, sumur terlindung, 
+#                 mata air terlindung) dengan jarak >= 10 m dari penampungan kotoran/limbah, 
+#                 dan air hujan (Rumus 1). 
+#                 Dikombinasikan dengan penggunaan air mandi/cuci yang bersumber dari air terlindung 
+#                 (leding meteran, leding eceran, sumur bor/pompa, sumur terlindung, 
+#                 mata air terlindung, dan air hujan) bila sumber air minum utama menggunakan 
+#                 air kemasan/isi ulang dan air tidak terlindungi 
+#                 (air terlindungi dengan jarak < 10 m dan air tidak terlindung)
+```
 
+```{r Pembentukan variable Air Minum Layak, echo=FALSE}
+indikator = "1.4.1.(d)"
 
-dt_temp = dt_ssnRT[,
-   .(
-      get(prov), get(kota_desa), get(sumber_air), 
-      get(jarak_sumber_air), get(bobot_rt), get(expcap),
-      AML = ifelse(get(sumber_air) == 3 | get(sumber_air) == 4 | get(sumber_air) == 11 |
-            (get(sumber_air) == 5 & get(jarak_sumber_air) == 2) |
-            (get(sumber_air) == 6 & get(jarak_sumber_air) == 2) |
-            (get(sumber_air) == 8 & get(jarak_sumber_air) == 2), 1, 0
-      )  
-   )
-]
-
-## rename column
-setnames(dt_temp, c("V1", "V2", "V3", "V4", "V5", "V6"),
-         c(prov, kota_desa, sumber_air, jarak_sumber_air, bobot_rt, expcap))
-
-## persentase Nasional, Kota, Desa
-dt_temp[,
-   .(
-      Nasional = 
-         round(sum(ifelse(AML == 1 & get(expcap) <= EXPCAP_40_NAS_RT,
-                          get(bobot_rt), 0)) * 100 
-               /sum(ifelse(get(expcap) <= EXPCAP_40_NAS_RT, 
-                          get(bobot_rt), 0)), 2),
+## define rincian untuk filter air minum layak
+switch(
+   vg_tahundata,
+   
+   "2015" = {
+      ## rincian2 imunisasi DPT
+      ##ar_DPT = c(r902f, r902g, r902h)
+   },
+   
+   "2016" = {
+      #  rincian air minum terlindungi
+      ## Leding meteran, Leding eceran, Air Hujan
+      ar_minum = c(3,4,11)
       
-      Kota = 
-         round(sum(ifelse(AML == 1 & get(kota_desa) == 1 & 
-                          get(expcap) <= EXPCAP_40_KOTA_RT, get(bobot_rt), 0)) * 100 
-               /sum(ifelse(get(kota_desa) == 1 & get(expcap) <= EXPCAP_40_KOTA_RT, 
-                          get(bobot_rt), 0)), 2),
+      #  rincian air terlindung dengan jarak >= 10m
+      ## Sumur bor/pompa, Sumur terlindung, Mata air terlindung
+      ar_minum_jarak = c(5,6,8)
       
-      Desa = 
-         round(sum(ifelse(AML == 1 & get(kota_desa) == 2 & 
-                          get(expcap) <= EXPCAP_40_DESA_RT, get(bobot_rt), 0)) * 100 
-               /sum(ifelse(get(kota_desa) == 2 & get(expcap) <= EXPCAP_40_DESA_RT, 
-                          get(bobot_rt), 0)), 2)
-   )
+      #  rincian air minum tidak sustain
+      ## Air kemasan bermerk, Air isi ulang
+      ar_tdk_sustain = c(1,2)
+      
+      #  rincian air minum tidak tidak terlindung
+      ## Sumur tak terlindung, Mata air tak terlindung, Air Sungai, lainnya
+      ar_tdk_terlindung = c(7,9,10,12)
+      
+      #  rincian air mandi/cuci yan terlindung
+      ## Leding meteran, Leding eceran, Sumur bor/pompa, Sumur terlindung
+      ## Mata air terlindung, Air Hujan
+      ar_mandi = c(3,4,5,6,8,11)
+   },
+   
+   "2017" = {
+      #  rincian air minum terlindungi
+      ## Leding, Air Hujan
+      ar_minum = c(3,10)
+      
+      #  rincian air terlindung dengan jarak >= 10m
+      ## Sumur bor/pompa, Sumur terlindung, Mata air terlindung
+      ar_minum_jarak = c(4,5,7)
+      
+      #  rincian air minum tidak sustain
+      ## Air kemasan bermerk, Air isi ulang
+      ar_tdk_sustain = c(1,2)
+      
+      #  rincian air minum tidak tidak terlindung
+      ## Sumur tak terlindung, Mata air tak terlindung, Air Sungai, lainnya
+      ar_tdk_terlindung = c(6,8,9,11)
+      
+      #  rincian air mandi/cuci yan terlindung
+      ## Leding, Sumur bor/pompa, Sumur terlindung
+      ## Mata air terlindung, Air Hujan
+      ar_mandi = c(3,4,5,7,10)
+   }
+)
+
+## define variable baru untuk air minum layak
+dt_ssnRT[,
+   air_layak:= as.integer(
+      ## penghitungan dengan rumus 1
+      (
+         ## air minum terlindungi
+         get(air_minum) %in% ar_minum |
+            
+         ## air minum terlindungi dengan jarak >= 10m
+         (get(air_minum) %in% ar_minum_jarak & get(jarak_air_minum) == 2)
+      ) |
+      
+      ## penghitungan rumus 2
+      (
+         ## air minum terlindungi dengan jarak < 10m atau tidah tahu
+         (
+            get(air_minum) %in% ar_minum_jarak & 
+            get(jarak_air_minum) != 2 &
+            mapply(cek_mandi, get(air_minum), get(air_mandi))
+            ## referensi penggunaan mapply di
+            ## https://stackoverflow.com/questions/25431307/r-data-table-apply-function-to-rows-using-columns-as-arguments
+         ) |
+         
+         ## air minum tidak sustain dan tidak terlindung
+         (
+            (get(air_minum) %in% ar_tdk_sustain | get(air_minum) %in% ar_tdk_terlindung) &
+            get(air_mandi) %in% ar_mandi
+         )
+      )
+   ) * 100
 ]
 ```
 
-```{r Provinsi, echo=FALSE}
-## merge dengan data EXPCAP provinsi
-setkey(dt_temp, R101)
-setkey(dt_EXPCAP_PROV_RT, R101)
-dt_temp = merge(dt_temp, dt_EXPCAP_PROV_RT, all.x = TRUE)
 
-## filter dengan EXPCAP dan persentasekan
-dt_temp[
-   get(expcap) <= EXPCAP_PROV,
-   .(
-       PAML = 
-          round(
-             sum(ifelse(AML == 1 , get(bobot_rt), 0)) * 100 /sum(get(bobot_rt)), 2)
-   ), by = c(prov)
+```{r Penghitungan angka nasional, include=FALSE, echo=FALSE}
+## Persentase Nasional
+hasil = dt_ssnRT[
+   ## filter kuintil nasional
+   QNas <= 2,
+   
+   ## Persentase Nasional
+   .(PNas =  weighted.mean(air_layak, get(bobot_rt), na.rm = TRUE))
 ]
+
+## simpan hasil di excel
+write2xl(hasil$PNas, "nasional")
+
+## Persentase Kota Desa
+hasil = dt_ssnRT[
+   ## filter kuintil Kota Desa
+   QKD <= 2,
+   
+   ## Persentase Kota Desa
+   .(PKD = weighted.mean(air_layak, get(bobot_rt), na.rm = TRUE)),
+   
+   ## group by kota desa
+   by = kota_desa
+]
+
+## simpan hasil di excel
+write2xl(unlist(c(hasil[1,2], hasil[2,2])), "kotadesa")
+```
+
+```{r Penghitungan angka provinsi, echo=FALSE, include=FALSE}
+## Penghitungan Perentase Provinsi
+hasil = dt_ssnRT[
+   ## filter kuintil Provinsi, 1 dan 2
+   QProv <= 2,
+   
+   ## Persentase Provinsi
+   .(PProv = weighted.mean(air_layak, get(bobot_rt), na.rm = TRUE)),
+   
+   ## agregasi Provinsi
+   by = prov
+]
+
+## simpan hasil di excel
+write2xl(hasil$PProv, "provinsi")
 ```
 
 ## Indikator 1.4.1.(e)
-```{r Nasional; Kota; Desa, echo=FALSE}
-# #########################################################################
+```{r Konsep dan Definisi, echo=FALSE, include=FALSE}
+# ************************************************************************
 # indikator 1.4.1.(e)
-# -------------------
+# ___________________
 # Persentase rumah tangga yang memiliki akses terhadap 
 # layanan sanitasi layak dan berkelanjutan
 #
@@ -551,20 +760,203 @@ dt_temp[
 #                 R1507A = 1 atau 2
 #                 R1507B = 1 
 #                 R1507C = 1 atau 3
-
-dt_temp = dt_ssnRT[,
-   .(
-      get(prov), get(kota_desa), get(expcap), get(bobot_rt),
-      LSL = ifelse(
-         (get(fas_bab) == 1 | get(fas_bab) == 2) & get(jenis_kloset) == 1 &
-         (get(tpa_tin) == 1 | get(tpa_tin) == 3), 1, 0
-      )
-   )
-]
-
-## rename column
-setnames(dt_temp, c("V1", "V2", "V3", "V4", "V5", "V6"),
-         c(prov, kota_desa, sumber_air, jarak_sumber_air, bobot_rt, expcap))
 ```
 
+```{r Nasional; Kota; Desa, echo=FALSE}
+indikator = "1.4.1.(e)"
+
+switch(
+   vg_tahundata,
+   
+   "2015" = {
+      
+   },
+   
+   "2016" = {
+      ar_fasBAB = c(1,2)
+      
+      ar_kloset = c(1)
+      
+      ar_tpa = c(1,2,3)
+   },
+   
+   "2017" = {
+      
+   }
+)
+
+dt_ssnRT[,
+   ## variable baru Layanan sanitasi layak
+   LSL:= as.integer(
+      get(fas_bab) %in% ar_fasBAB &
+      get(jenis_kloset) %in% ar_kloset &
+      get(tpa) %in% ar_tpa
+   ) * 100
+]
+```
+
+```{r Penghitungan angka nasional, include=FALSE, echo=FALSE}
+## Persentase Nasional
+hasil = dt_ssnRT[
+   ## filter kuintil nasional
+   QNas <= 2,
+   
+   ## Persentase Nasional
+   .(PNas =  weighted.mean(LSL, get(bobot_rt), na.rm = TRUE))
+]
+
+## simpan hasil di excel
+write2xl(hasil$PNas, "nasional")
+
+## Persentase Kota Desa
+hasil = dt_ssnRT[
+   ## filter kuintil Kota Desa
+   QKD <= 2,
+   
+   ## Persentase Kota Desa
+   .(PKD = weighted.mean(LSL, get(bobot_rt), na.rm = TRUE)),
+   
+   ## group by kota desa
+   by = kota_desa
+]
+
+## simpan hasil di excel
+write2xl(unlist(c(hasil[1,2], hasil[2,2])), "kotadesa")
+```
+
+```{r Penghitungan angka provinsi, echo=FALSE, include=FALSE}
+## Penghitungan Perentase Provinsi
+hasil = dt_ssnRT[
+   ## filter kuintil Provinsi, 1 dan 2
+   QProv <= 2,
+   
+   ## Persentase Provinsi
+   .(PProv = weighted.mean(LSL, get(bobot_rt), na.rm = TRUE)),
+   
+   ## agregasi Provinsi
+   by = prov
+]
+
+## simpan hasil di excel
+write2xl(hasil$PProv, "provinsi")
+```
+
+## Indikator 1.4.1.(f)
+```{r Konsep dan Definisi, echo=FALSE, include=FALSE}
+# ************************************************************************
+# indikator 1.4.1.(f)
+# ___________________
+# Persentase Persentase rumah tangga kumuh perkotaan
+#
+# RUMUS ******************************************************************
+#              JRTKP
+# PRTKP = ---------------- X 100%
+#              JRTP        
+#
+# Keterangan
+# PRTKP        = Persentase rumah tangga kumuh perkotaan
+# JRTKP        = Jumlah rumah tangga kumuh di perkotaan
+#                pada waktu tertentu (penduduk 40% terbawah/
+#                berpendapatan terendah)
+# JRTP         = Jumlah rumah tangga seluruhnya
+#                (penduduk 40% terbawah/berpendapatan terendah)
+#************************************************************************
+
+# Daerah kumuh adalah daerah atau kawasan tempat tinggal (hunian) 
+# yang dihuni sekelompok orang yang menempati bangunan sementara, 
+# tidak ada akses air yang aman untuk diminum, tidak ada
+# fasilitas sanitasi yang layak, dan kondisi lingkungan yang tidak memadai. 
+# Persentase rumah tangga kumuh adalah perbandingan antara banyaknya
+# rumah tangga kumuh dengan jumlah rumah tangga seluruhnya, 
+# dinyatakan dalam satuan persen (%).
+# Rumah tangga kumuh didefinisikan sebagai rumah tangga yang 
+# tidak memiliki akses terhadap sumber air minum layak, sanitasi layak, 
+# luas lantai > 7, 2 m2 per kapita, kondisi atap, lantai, 
+# dan dinding yang layak. Dihitung dengan menggunakan pembobot
+# untuk masing-masing indikator, dikatakan kumuh jika rumah tangga 
+# memiliki nilai kategori > 35%.
+# Perhitungan indikator ini difokuskan pada penduduk 40% terbawah yaitu 
+# tingkat pendapatan rendah (kuintil 1 dan kuintil 2).
+```
+
+```{r Pembentukan variable Rumah Kumuh Perkotaan, echo=FALSE, include=FALSE}
+indikator = "1.4.1.(f)"
+
+
+## definisi rincian2 menurut tahun data
+switch(
+   vg_tahundata,
+   
+   "2015" = {
+      
+   },
+   
+   "2016" = {
+      ## rincian jenis bahan atap yang layak
+      ar_atap = c(1,2,3,4,5,6,7,8)
+      
+      ## rincian jenis bahan dinding yang layak
+      ar_dinding = c(1,2,3,4)
+      
+      ## rincian jenis bahan lantai yang layak
+      ar_lantai = c(1,2,3,4,5,6,7,8)
+      
+      
+   },
+   
+   "2017" = {
+      ## rincian jenis bahan atap yang layak
+      ar_atap = c(1,2,3,4,5,6)
+      
+      ## rincian jenis bahan dinding yang layak
+      ar_dinding = c(1,2,3,4)
+      
+      ## rincian jenis bahan lantai yang layak
+      ar_lantai = c(1,2,3,4,5,6,7)
+   }
+)
+
+dt_ssnRT[,
+   `:=`(
+      ## kriteria sanitasi
+      ## kebalikan dari sanitasi layak
+      Rsani = abs(LSL/100 - 1),
+      
+      ## kriteria luas lantai
+      Rsuff = as.integer((get(luas_lantai) / get(n_art)) <= 7.2),
+      
+      ## kriteria durability (aladin)
+      durab = as.integer(
+         ## jika 2 dari 3 kriteria terpenuhi => dianggap kumuh
+         (
+            ## kriteria atap
+            ifelse(get(atap) %in% ar_atap, 0, 1) +
+         
+            ## kriteria dinding
+            ifelse(get(dinding) %in% ar_dinding, 0, 1) + 
+         
+            ## kriteria lantai
+            ifelse(get(lantai) %in% ar_lantai, 0, 1)
+         ) >= 2
+      ),
+      
+      ## kriteria air minum
+      ## kebalikan dari air minum layak
+      Rair = abs(air_layak/100 - 1)
+   )
+][,
+   ## skoring rumah tangga kumuh
+   RTKumuh:= ifelse(
+     ((Rair * 15) + (Rsani * 15) + (Rsuff * 35) + (durab * 35)) > 35, 100, 0
+   ) 
+]
+
+dt_ssnRT[
+   ## filter kuintil nasional
+   QNas <= 2,
+   
+   ## Persentase Nasional
+   .(PNas =  weighted.mean(RTKumuh, get(bobot_rt), na.rm = TRUE))
+]
+```
 
