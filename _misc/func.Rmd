@@ -1,0 +1,78 @@
+---
+title: "Function"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r Funcion Tabulasi TPB, include=FALSE, echo=FALSE}
+
+```
+
+
+```{r Function Write2excel, include=FALSE, echo=FALSE}
+# function untuk export hasil ke excel
+
+## load lib
+library(XLConnect)
+
+## function untuk menambah series data hasil olahan R dalam bentuk Excel
+### parameter file excel, sheet sudah ditentukan terlebih dahulu
+write2xl = function(data_, agregasi, append_ = TRUE, overwrite_ = FALSE) {
+   if (dir_hasil == "" | tujuan == "" | indikator == "") {
+      print("Variabel belum diseting")
+      result = FALSE
+   } 
+   
+   else {
+      path_wb_ = paste(dir_hasil, "/", tujuan, ".xlsx", sep = "")
+      wb_ = loadWorkbook(path_wb_)
+      dfxl = readWorksheet(wb_, sheet = indikator)
+      
+      switch(
+         tolower(agregasi),
+         
+         "nasional" = {
+            keyw_ = "Indonesia"
+         },
+         
+         "provinsi" = {
+            keyw_ = "Aceh"
+         },
+         
+         "kotadesa" = {
+            keyw_ = "Perkotaan"
+         },
+         
+         "jk" = {
+            keyw_ = "Laki"
+         } 
+      )
+      
+      # pointer baris
+      row_ = as.numeric(
+         row.names(dfxl[match(keyw_,dfxl$Disagregasi),])
+      )
+      
+      # pointer kolom
+      if (sum(names(dfxl) %like% vg_tahundata) > 0) {
+         col_ = grep(vg_tahundata, names(dfxl))
+      }
+      
+      else {
+         col_ = 2
+      }
+      
+      ## write data
+      writeWorksheet(
+         wb_, data_, sheet = indikator,
+         startRow = row_, startCol = col_
+      )
+      
+      saveWorkbook(wb_)
+   }   
+}
+```
+
