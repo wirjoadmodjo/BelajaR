@@ -111,22 +111,28 @@ dt_ssnRT[,
 #              R1302A = Rumah Sakit/Rumah Sakit Bersalin, 
 #                       Klinik/Bidan/Praktek Dokter
 #                       Puskesmas/Pustu/Polindes
+
+# Faskes ==>   Rumah Sakit/Rumah Sakit Bersalin, 
+#              Klinik/Bidan/Praktek Dokter,
+#              Puskesmas/Pustu/Polindes
 ```
 
 ```{r Pembentukan variable JPSalifaskes, echo=FALSE}
 indikator = "1.4.1.(a)"
 
-
 ## define rincian faskes persalinan berdasarkan tahun data
 faskes2015 = c("2015", "2016")
 if (any(faskes2015 == vg_tahundata)) {
-   faskes = c(1,2,3) 
+   faskes = c(1,2,3)
 }
 
 faskes2017 = c("2017")
 if (any(faskes2017 == vg_tahundata)) {
    faskes = c(1,2,3,4,5,6) 
 }
+
+## hapus var
+rm("faskes2015", "faskes2017")
 
 dt_ssnIND[
    ## filter jenis kelamin
@@ -234,50 +240,40 @@ nCampak = 1
 nBCG = 1
 nHB = 3
 
-## define imunisasi berdasarkan tahun survey
-switch(
-   vg_tahundata,
-   
-   "2015" = {
-      ## rincian2 imunisasi DPT
-      ##ar_DPT = c(r902f, r902g, r902h)
-   },
-   
-   "2016" = {
-      ## rincian semua imunisasi
-      ar_imun = c(imun_bcg, imun_polio1, imun_polio2, imun_polio3, imun_polio4,
-                  imun_dpt1, imun_dpt2, imun_dpt3, imun_hb_lahir, imun_hb1,
-                  imun_hb2, imun_hb3, imun_campak)
+## define rincian2 imunisasi berdasarkan tahun data
+imun2015 = c("2015", "2016")
+if (any(imun2015 == vg_tahundata)) {
+   ar_imun = c(imun_bcg, imun_polio1, imun_polio2, imun_polio3, imun_polio4,
+               imun_dpt1, imun_dpt2, imun_dpt3, imun_hb_lahir, imun_hb1,
+               imun_hb2, imun_hb3, imun_campak)
       
-      ar_bcg = c(imun_bcg)
-      
-      ar_polio = c(imun_polio1, imun_polio2, imun_polio3, imun_polio4)
-      
-      ar_dpt = c(imun_dpt1, imun_dpt2, imun_dpt3)
-      
-      ar_hb = c(imun_hb_lahir, imun_hb1, imun_hb2, imun_hb3)
-      
-      ar_campak = c(imun_campak)
-   },
-   
-   "2017" = {
-      ## rincian semua imunisasi
-      ar_imun = c(imun_bcg, imun_polio1, imun_polio2, imun_polio3, imun_polio4,
-                  imun_dpt1, imun_dpt2, imun_dpt3, imun_hb_lahir, imun_hb1,
-                  imun_hb2, imun_hb3, imun_campak)
+   ar_bcg = c(imun_bcg)
+   ar_polio = c(imun_polio1, imun_polio2, imun_polio3, imun_polio4)
+   ar_dpt = c(imun_dpt1, imun_dpt2, imun_dpt3)
+   ar_hb = c(imun_hb_lahir, imun_hb1, imun_hb2, imun_hb3)
+   ar_campak = c(imun_campak)
+}
+
+imun2017 = c("2017")
+if (any(imun2017 == vg_tahundata)) {
+   ar_imun = c(imun_bcg, imun_polio1, imun_polio2, imun_polio3, imun_polio4,
+               imun_dpt1, imun_dpt2, imun_dpt3, imun_hb_lahir, imun_hb1,
+               imun_hb2, imun_hb3, imun_campak)
        
        
-      ar_imun = c("r1104a_tgl", "r1104b_tgl", "r1104c_tgl", "r1104d_tgl", "r1104e_tgl",
-                  "r1104f_tgl", "r1104g_tgl", "r1104h_tgl", "r1104i_tgl", "r1104j_tgl",
-                  "r1104k_tgl", "r1104l_tgl", "r1104m_tgl", "r1104n_tgl")
+   ar_imun = c("r1104a_tgl", "r1104b_tgl", "r1104c_tgl", "r1104d_tgl", "r1104e_tgl",
+               "r1104f_tgl", "r1104g_tgl", "r1104h_tgl", "r1104i_tgl", "r1104j_tgl",
+               "r1104k_tgl", "r1104l_tgl", "r1104m_tgl", "r1104n_tgl")
       
-      # clean data
-      ## replace data tanggal imunisasi ke 1 bila tanggal > 0
-      for (j in names(dt_ssnIND[, ar_imun, with = FALSE])) {
-         set(dt_ssnIND,which(dt_ssnIND[[j]] > 0),j,1)
-      }
+   # clean data
+   ## replace data tanggal imunisasi ke 1 bila tanggal > 0
+   for (j in names(dt_ssnIND[, ar_imun, with = FALSE])) {
+      set(dt_ssnIND,which(dt_ssnIND[[j]] > 0),j,1)
    }
-)
+}
+
+## remove temp var
+rm("imun2015", "imun2017")
 
 ## cleaning data, replace NA value to 0
 for (j in names(dt_ssnIND[, ar_imun, with = FALSE])) {
