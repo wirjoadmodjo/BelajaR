@@ -19,7 +19,7 @@ library(data.table)
 vg_subject = "tpb"
 
 ## tahun data yang diolah
-vg_tahundata = "2017"
+vg_tahundata = "2015"
 
 # direktori dan nama rawdata yang akan dipakai
 switch(
