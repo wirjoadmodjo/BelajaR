@@ -132,7 +132,7 @@ dt_ssnIND[,
                 
       ## cek jumlah imunisasi Campak
       (kcampak + mcampak) >= nCampak
-   )
+   ) 
 ]
 
 
@@ -162,7 +162,7 @@ hasil = dt_ssnIND[
    
    ## Persentase Kota-Desa
    .(PKD =  weighted.mean(IDL, get(bobot), na.rm = TRUE) * 100),
-   by = get(kota_desa)
+   by = kota_desa
 ]
 
 ## simpan hasil di excel
@@ -179,7 +179,7 @@ hasil = dt_ssnIND[
    
    ## Persentase Nasional
    .(PJK =  weighted.mean(IDL, get(bobot), na.rm = TRUE) * 100),
-   by = get(jenis_kel)
+   by = jenis_kel
 ]
 
 ## simpan hasil di excel
@@ -196,7 +196,7 @@ hasil = dt_ssnIND[
    
    ## Persentase Nasional
    .(PProv =  weighted.mean(IDL, get(bobot), na.rm = TRUE) * 100),
-   by = get(prov)
+   by = prov
 ]
 
 ## simpan hasil di excel

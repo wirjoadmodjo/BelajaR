@@ -30,7 +30,7 @@ dt_ssnIND[
    
    ## variable baru 
    ## penduduk yang melakukan persalinan di Faskes
-   JPSalifaskes:= as.integer(get(tempat_salin) %in% faskes) * 100
+   JPSalifaskes:= as.integer(get(tempat_salin) %in% faskes)
 ]
 
 ## Persentase Nasional
@@ -39,7 +39,7 @@ hasil = dt_ssnIND[
    QNas <= 2,
    
    ## Persentase Nasional
-   .(PNas =  weighted.mean(JPSalifaskes, get(bobot), na.rm = TRUE))
+   .(PNas =  weighted.mean(JPSalifaskes, get(bobot), na.rm = TRUE) * 100)
 ]
 
 ## simpan hasil di excel
@@ -51,7 +51,7 @@ hasil = dt_ssnIND[
    QKD <= 2,
    
    ## Persentase Kota Desa
-   .(PKD = weighted.mean(JPSalifaskes, get(bobot), na.rm = TRUE)),
+   .(PKD = weighted.mean(JPSalifaskes, get(bobot), na.rm = TRUE) * 100),
    
    ## group by kota desa
    by = kota_desa
@@ -66,7 +66,7 @@ hasil = dt_ssnIND[
    QProv <= 2,
    
    ## Persentase Provinsi
-   .(PProv = weighted.mean(JPSalifaskes, get(bobot), na.rm = TRUE)),
+   .(PProv = weighted.mean(JPSalifaskes, get(bobot), na.rm = TRUE) * 100),
    
    ## agregasi Provinsi
    by = prov
