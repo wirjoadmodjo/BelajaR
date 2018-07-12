@@ -12,7 +12,7 @@ dt_ssnIND[
    
    ## variale baru
    ## PUS yang menggunakan KB
-   PUS_CPRCS:= as.integer(get(kb_pakai) == 2) * 100
+   PUS_CPRCS:= as.integer(get(kb_pakai) == 2)
 ]
 
 ## Persentase Nasional
@@ -21,7 +21,7 @@ hasil = dt_ssnIND[
    QNas <= 2,
    
    ## Persentase Nasional
-   .(PNas =  weighted.mean(PUS_CPRCS, get(bobot), na.rm = TRUE))
+   .(PNas =  weighted.mean(PUS_CPRCS, get(bobot), na.rm = TRUE) * 100)
 ]
 
 ## simpan hasil di excel
@@ -33,7 +33,7 @@ hasil = dt_ssnIND[
    QKD <= 2,
    
    ## Persentase Kota Desa
-   .(PKD = weighted.mean(PUS_CPRCS, get(bobot), na.rm = TRUE)),
+   .(PKD = weighted.mean(PUS_CPRCS, get(bobot), na.rm = TRUE) * 100),
    
    ## group by kota desa
    by = kota_desa
@@ -48,7 +48,7 @@ hasil = dt_ssnIND[
    QProv <= 2,
    
    ## Persentase Provinsi
-   .(PProv = weighted.mean(PUS_CPRCS, get(bobot), na.rm = TRUE)),
+   .(PProv = weighted.mean(PUS_CPRCS, get(bobot), na.rm = TRUE) * 100),
    
    ## agregasi Provinsi
    by = prov
